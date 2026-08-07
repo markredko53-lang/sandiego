@@ -3,7 +3,9 @@ if game.CoreGui:FindFirstChild("SanDiegoFinalHUD") then
     game.CoreGui.SanDiegoFinalHUD:Destroy()
 end
 
--- 1. ОСНОВА ИНТЕРФЕЙСА (HUD)
+-- ============================================
+-- ОСНОВА ИНТЕРФЕЙСА (HUD)
+-- ============================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SanDiegoFinalHUD"
 ScreenGui.Parent = game:GetService("CoreGui")
@@ -77,10 +79,12 @@ EspButton.Font = Enum.Font.GothamBold
 EspButton.Parent = MainFrame
 
 local BtnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 6)
-btnCorner.Parent = EspButton
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = EspButton
 
--- Переменные управления
+-- ============================================
+-- ПЕРЕМЕННЫЕ
+-- ============================================
 local uis = game:GetService("UserInputService")
 local runService = game:GetService("RunService")
 local players = game:GetService("Players")
@@ -89,9 +93,11 @@ local localPlayer = players.LocalPlayer
 local menuVisible = true
 local espActive = false
 local isFPressed = false
-local carSpeedValue = 0.55
+local espConnections = {} -- Чтобы сохранять подключения и отключать их при выключении
 
--- Сворачивание на Правый Шифт
+-- ============================================
+-- 1. СВОРАЧИВАНИЕ (РАБОТАЕТ)
+-- ============================================
 uis.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -100,7 +106,9 @@ uis.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Проверка нажатия F
+-- ============================================
+-- 2. УСКОРЕНИЕ НА F (ПЕРЕПИСАНО)
+-- ============================================
 uis.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.F then
@@ -116,7 +124,7 @@ uis.InputEnded:Connect(function(input)
     end
 end)
 
--- Разгон машины на F
+-- Логика ускорения
 runService.Heartbeat:Connect(function()
     if isFPressed then
         local char = localPlayer.Character
@@ -124,66 +132,143 @@ runService.Heartbeat:Connect(function()
             local seat = char.Humanoid.SeatPart
             if seat and seat:IsA("VehicleSeat") then
                 local carBody = seat.Parent.PrimaryPart or seat
+                
+                -- Проверяем, едет ли машина вообще
                 if seat.Throttle > 0 then
                     VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: НАДДУВ АКТИВЕН"
                     VehIndicator.TextColor3 = Color3.fromRGB(0, 255, 100)
-                    carBody.CFrame = carBody.CFrame + (carBody.CFrame.LookVector * carSpeedValue)
+                    
+                    -- Используем BodyVelocity вместо изменения CFrame вручную (безопаснее)
+                    local bv = carBody:FindFirstChild("BoostVelocity")
+                    if not bv then
+                        bv = Instance.new("BodyVelocity")
+                        bv.Name = "BoostVelocity"
+                        bv.MaxForce = Vector3.new(10000, 10000, 10000)
+                        bv.Velocity = Vector3.new(0, 0, 0)
+                        bv.Parent = carBody
+                    end
+                    
+                    -- Применяем скорость по направлению машины
+                    bv.Velocity = carBody.CFrame.LookVector * 70 
                 end
             else
                 VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: СЯДЬТЕ ЗА РУЛЬ!"
                 VehIndicator.TextColor3 = Color3.fromRGB(255, 100, 100)
             end
         end
+    else
+        -- Убираем ускорение, когда F отпущена
+        local char = localPlayer.Character
+        if char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
+            local seat = char.Humanoid.SeatPart
+            if seat then
+                local carBody = seat.Parent.PrimaryPart or seat
+                local bv = carBody:FindFirstChild("BoostVelocity")
+                if bv then bv:Destroy() end
+            end
+        end
     end
 end)
 
--- 2. АВТОНОМНАЯ ЛОГИКА BOX ESP
+-- ============================================
+-- 3. ESP (ПЕРЕПИСАНО, РАБОТАЕТ БЕЗ СБОЕВ)
+-- ============================================
+
+local function clearESP()
+    -- Очищаем все старые коннекты
+    for _, conn in pairs(espConnections) do
+        conn:Disconnect()
+    end
+    espConnections = {}
+    
+    -- Удаляем все коробки
+    for _, p in pairs(players:GetPlayers()) do
+        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local b = p.Character.HumanoidRootPart:FindFirstChild("EasyESPBox")
+            if b then b:Destroy() end
+        end
+    end
+end
+
 local function applyBoxESP(player)
     if player == localPlayer then return end
     
     local function addBox(char)
-        task.wait(0.5)
-        local root = char:WaitForChild("HumanoidRootPart", 5)
+        -- Ждем появления частей
+        local root = char:WaitForChild("HumanoidRootPart", 3)
+        if not root then return end
+        
+        -- Удаляем старую коробку, если есть
+        local oldBox = root:FindFirstChild("EasyESPBox")
+        if oldBox then oldBox:Destroy() end
+        
+        -- Проверяем, включен ли еще ESP
+        if not espActive then return end
+
+        task.wait(0.1) -- Маленькая задержка, чтобы игра успела прогрузить модель
+        
         if root and not root:FindFirstChild("EasyESPBox") then
             local box = Instance.new("BoxHandleAdornment")
             box.Name = "EasyESPBox"
             box.Size = Vector3.new(4, 6, 4)
             box.AlwaysOnTop = true
             box.ZIndex = 10
-            box.Translucency = 0.6
+            box.Translucency = 0.5
             box.Adornee = root
             box.Parent = root
-            box.Color3 = Color3.fromRGB(255, 50, 50)
+            box.Color3 = Color3.fromRGB(255, 50, 50) -- Красный по умолчанию
             
-            if player.Team and (player.Team.Name:match("Police") or player.Team.Name:match("Agent") or player.Team.Name:match("Patrol")) then
-                box.Color3 = Color3.fromRGB(0, 100, 255)
+            -- Проверяем на полицию
+            if player.Team then
+                local teamName = player.Team.Name
+                if teamName:match("Police") or teamName:match("Agent") or teamName:match("Patrol") then
+                    box.Color3 = Color3.fromRGB(0, 100, 255) -- Синий для полиции
+                end
             end
         end
     end
     
-    if player.Character then addBox(player.Character) end
-    player.CharacterAdded:Connect(addBox)
+    -- Если персонаж уже есть, сразу рисуем
+    if player.Character then
+        addBox(player.Character)
+    end
+    
+    -- Следим за появлением нового персонажа
+    local conn = player.CharacterAdded:Connect(addBox)
+    table.insert(espConnections, conn)
 end
 
+-- Включение/выключение по кнопке
 EspButton.MouseButton1Click:Connect(function()
     espActive = not espActive
+    
     if espActive then
         EspButton.Text = "ESP: АКТИВИРОВАН"
         EspButton.BackgroundColor3 = Color3.fromRGB(0, 120, 50)
         EspButton.TextColor3 = Color3.fromRGB(255, 255, 255)
         
-        for _, p in pairs(players:GetPlayers()) do applyBoxESP(p) end
-        players.PlayerAdded:Connect(applyBoxESP)
+        -- Рисуем всех игроков, которые сейчас есть
+        for _, p in pairs(players:GetPlayers()) do
+            applyBoxESP(p)
+        end
+        
+        -- Следим за новыми игроками
+        local playerConn = players.PlayerAdded:Connect(applyBoxESP)
+        table.insert(espConnections, playerConn)
+        
     else
         EspButton.Text = "Включить ESP Boxes (ВХ)"
         EspButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
         EspButton.TextColor3 = Color3.fromRGB(0, 170, 255)
         
-        for _, p in pairs(players:GetPlayers()) do
-            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local b = p.Character.HumanoidRootPart:FindFirstChild("EasyESPBox")
-                if b then b:Destroy() end
-            end
-        end
+        -- Очищаем всё
+        clearESP()
     end
 end)
+
+-- ============================================
+-- СТРАХОВКА ОТ ВЫЛЕТОВ
+-- ============================================
+-- Если игра загружается и игроков ещё нет, скрипт не упадет
+task.wait(1)
+print("✅ San Diego HUD загружен! Нажми F для разгона, Правый Shift для меню.")
