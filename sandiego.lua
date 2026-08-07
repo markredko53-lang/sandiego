@@ -1,92 +1,55 @@
-if game.CoreGui:FindFirstChild("EasyXenoMenu") then
-    game.CoreGui.EasyXenoMenu:Destroy()
+if game.CoreGui:FindFirstChild("VehicleXenoMenu") then
+    game.CoreGui.VehicleXenoMenu:Destroy()
 end
 
 local ui = Instance.new("ScreenGui")
-ui.Name = "EasyXenoMenu"
+ui.Name = "VehicleXenoMenu"
 ui.Parent = game.CoreGui
 
 local button = Instance.new("TextButton")
 button.Parent = ui
-button.Size = UDim2.new(0, 260, 0, 50)
-button.Position = UDim2.new(0.4, 0, 0.35, 0)
-button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-button.Text = "Байпас скорости: ВЫКЛ"
+button.Size = UDim2.new(0, 260, 0, 60)
+button.Position = UDim2.new(0.4, 0, 0.4, 0)
+button.BackgroundColor3 = Color3.fromRGB(180, 70, 0) -- Оранжевый цвет
+button.Text = "РАЗГОН МАШИНЫ: ВЫКЛ\n(Сначала сядьте за руль!)"
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
-button.TextSize = 14
+button.TextSize = 13
 
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = button
 
--- Информационный текст для настройки скорости
-local infoText = Instance.new("TextLabel")
-infoText.Parent = ui
-infoText.Size = UDim2.new(0, 260, 0, 30)
-infoText.Position = UDim2.new(0.4, 0, 0.45, 0)
-infoText.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-infoText.Text = "Текущий множитель: 0.15 (Безопасно)"
-infoText.TextColor3 = Color3.fromRGB(255, 255, 255)
-infoText.TextSize = 12
-
-local infoCorner = Instance.new("UICorner")
-infoCorner.CornerRadius = UDim.new(0, 5)
-infoCorner.Parent = infoText
-
--- Кнопки быстрой регулировки скорости (чтобы найти идеальный баланс)
-local PlusButton = Instance.new("TextButton")
-PlusButton.Parent = ui
-PlusButton.Size = UDim2.new(0, 125, 0, 30)
-PlusButton.Position = UDim2.new(0.4, 0, 0.51, 0)
-PlusButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-PlusButton.Text = "Скорость +"
-PlusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlusButton.Parent = ui
-
-local MinusButton = Instance.new("TextButton")
-MinusButton.Parent = ui
-MinusButton.Size = UDim2.new(0, 125, 0, 30)
-MinusButton.Position = UDim2.new(0.4, 135, 0.51, 0)
-MinusButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-MinusButton.Text = "Скорость -"
-MinusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinusButton.Parent = ui
-
--- Переменные настройки
-local speedBypassActive = false
-local speedMultiplier = 0.15 -- Шаг микро-телепортации. Чем меньше, тем безопаснее!
+local carSpeedActive = false
+local carSpeedMultiplier = 2.5 -- Множитель скорости машины (в 2.5 раза быстрее обычного)
 
 button.MouseButton1Click:Connect(function()
-    speedBypassActive = not speedBypassActive
-    if speedBypassActive then
-        button.Text = "Байпас скорости: РАБОТАЕТ"
-        button.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    carSpeedActive = not carSpeedActive
+    if carSpeedActive then
+        button.Text = "РАЗГОН МАШИНЫ: РАБОТАЕТ\n(Зажмите W для полета/быстрой езды)"
+        button.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
     else
-        button.Text = "Байпас скорости: ВЫКЛ"
-        button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        button.Text = "РАЗГОН МАШИНЫ: ВЫКЛ\n(Сначала сядьте за руль!)"
+        button.BackgroundColor3 = Color3.fromRGB(180, 70, 0)
     end
 end)
 
-PlusButton.MouseButton1Click:Connect(function()
-    speedMultiplier = speedMultiplier + 0.05
-    infoText.Text = "Текущий множитель: " .. string.format("%.2f", speedMultiplier)
-end)
-
-MinusButton.MouseButton1Click:Connect(function()
-    if speedMultiplier > 0.05 then
-        speedMultiplier = speedMultiplier - 0.05
-        infoText.Text = "Текущий множитель: " .. string.format("%.2f", speedMultiplier)
-    end
-end)
-
--- ОПТИМИЗИРОВАННЫЙ ЦИКЛ С ПАУЗАМИ ДЛЯ ОБХОДА ПРОВЕРКИ ДИСТАНЦИИ
+-- Цикл ускорения машины через физический импульс (Velocity)
 game:GetService("RunService").Heartbeat:Connect(function()
-    if speedBypassActive then
+    if carSpeedActive then
         local player = game.Players.LocalPlayer
         local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.MoveDirection.Magnitude > 0 then
-            -- Смещаем персонажа по направлению ходьбы с учетом нашего множителя
-            char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame + (char.Humanoid.MoveDirection * speedMultiplier)
+        if char and char:FindFirstChild("Humanoid") then
+            -- Проверяем, сидит ли игрок в машине
+            local seat = char.Humanoid.SeatPart
+            if seat and seat:IsA("VehicleSeat") then
+                -- Находим основную деталь кузова машины
+                local carBody = seat.Parent.PrimaryPart or seat
+                -- Если нажата кнопка газа (машина пытается ехать вперед)
+                if seat.Throttle > 0 then
+                    -- Добавляем физическое ускорение кузову вперед
+                    carBody.AssemblyLinearVelocity = carBody.CFrame.LookVector * (seat.MaxSpeed * carSpeedMultiplier)
+                end
+            end
         end
     end
 end)
