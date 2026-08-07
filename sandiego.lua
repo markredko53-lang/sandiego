@@ -1,438 +1,338 @@
 -- ============================================
--- XENO SUIT SYSTEM v4.0
--- РАБОЧАЯ КЛИЕНТСКАЯ ВЕРСИЯ
--- Без OnServerEvent ошибок!
+-- XENO SUIT SYSTEM v7.0
+-- ДЛЯ INJECTOR (GitHub Version)
+-- SAN DIEGO BORDER RP
 -- ============================================
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
+
+if not Player then 
+    print("❌ Ошибка: Игрок не найден!")
+    return
+end
+
+print("✅ Xeno Loader запущен...")
 
 -- ============================================
--- КОНФИГУРАЦИЯ
+-- КОНФИГ
 -- ============================================
 
-local CONFIG = {
-    Levels = {
-        [1] = {
-            Name = "Light Xeno",
-            Color = Color3.fromRGB(100, 200, 255),
-            Health = 150,
-            Speed = 20,
-            JumpPower = 80,
-            Shield = 50,
-            Damage = 10
-        },
-        [2] = {
-            Name = "Medium Xeno",
-            Color = Color3.fromRGB(0, 150, 255),
-            Health = 200,
-            Speed = 22,
-            JumpPower = 90,
-            Shield = 100,
-            Damage = 15
-        },
-        [3] = {
-            Name = "Heavy Xeno",
-            Color = Color3.fromRGB(255, 100, 0),
-            Health = 300,
-            Speed = 18,
-            JumpPower = 70,
-            Shield = 200,
-            Damage = 20
-        },
-        [4] = {
-            Name = "Elite Xeno",
-            Color = Color3.fromRGB(255, 0, 255),
-            Health = 400,
-            Speed = 25,
-            JumpPower = 100,
-            Shield = 300,
-            Damage = 25
-        },
-        [5] = {
-            Name = "Legendary Xeno",
-            Color = Color3.fromRGB(255, 215, 0),
-            Health = 500,
-            Speed = 30,
-            JumpPower = 120,
-            Shield = 500,
-            Damage = 35
-        }
-    },
-    
-    Abilities = {
-        ShieldBoost = {
-            Name = "🛡️ Shield Boost",
-            Cooldown = 30,
-            Duration = 10,
-            Multiplier = 2,
-            Key = Enum.KeyCode.One
-        },
-        SpeedBoost = {
-            Name = "⚡ Speed Boost",
-            Cooldown = 20,
-            Duration = 8,
-            Multiplier = 1.5,
-            Key = Enum.KeyCode.Two
-        },
-        JumpBoost = {
-            Name = "🚀 Jump Boost",
-            Cooldown = 15,
-            Duration = 5,
-            Multiplier = 2,
-            Key = Enum.KeyCode.Three
-        },
-        Heal = {
-            Name = "❤️ Self Heal",
-            Cooldown = 45,
-            HealAmount = 50,
-            Key = Enum.KeyCode.Four
-        }
-    }
-}
-
--- ============================================
--- ДАННЫЕ
--- ============================================
-
-local XenoData = {
+local Xeno = {
     Level = 1,
     Equipped = false,
     Shield = 0,
     MaxShield = 0,
+    
+    Levels = {
+        [1] = {Name = "Light Xeno", Color = Color3.fromRGB(100, 200, 255), Health = 150, Speed = 20, Shield = 50, Power = 10},
+        [2] = {Name = "Medium Xeno", Color = Color3.fromRGB(0, 150, 255), Health = 200, Speed = 22, Shield = 100, Power = 15},
+        [3] = {Name = "Heavy Xeno", Color = Color3.fromRGB(255, 100, 0), Health = 300, Speed = 18, Shield = 200, Power = 20},
+        [4] = {Name = "Elite Xeno", Color = Color3.fromRGB(255, 0, 255), Health = 400, Speed = 25, Shield = 300, Power = 25},
+        [5] = {Name = "Legendary Xeno", Color = Color3.fromRGB(255, 215, 0), Health = 500, Speed = 30, Shield = 500, Power = 35}
+    },
+    
     Abilities = {
-        ShieldBoost = { Cooldown = 0, Active = false },
-        SpeedBoost = { Cooldown = 0, Active = false },
-        JumpBoost = { Cooldown = 0, Active = false },
-        Heal = { Cooldown = 0 }
+        ShieldBoost = {Name = "🛡️ Shield Boost", Cooldown = 30, Duration = 10, Key = Enum.KeyCode.One},
+        SpeedBoost = {Name = "⚡ Speed Boost", Cooldown = 20, Duration = 8, Key = Enum.KeyCode.Two},
+        JumpBoost = {Name = "🚀 Jump Boost", Cooldown = 15, Duration = 5, Key = Enum.KeyCode.Three},
+        Heal = {Name = "❤️ Self Heal", Cooldown = 45, Key = Enum.KeyCode.Four},
+        Invis = {Name = "👻 Invisibility", Cooldown = 60, Duration = 15, Key = Enum.KeyCode.Five}
     }
 }
 
-local XenoParts = {}
+local Abilities = {
+    ShieldBoost = {Cooldown = 0, Active = false, Timer = 0},
+    SpeedBoost = {Cooldown = 0, Active = false, Timer = 0},
+    JumpBoost = {Cooldown = 0, Active = false, Timer = 0},
+    Heal = {Cooldown = 0},
+    Invis = {Cooldown = 0, Active = false, Timer = 0}
+}
+
 local Connections = {}
-local UI = {}
+local XenoParts = {}
 
 -- ============================================
--- СОЗДАНИЕ UI
+-- СОЗДАНИЕ GUI
 -- ============================================
 
 local function CreateUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "XenoUI"
-    screenGui.Parent = Player.PlayerGui
-    screenGui.ResetOnSpawn = false
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "XenoSystem"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
     
-    -- ГЛАВНАЯ ПАНЕЛЬ
-    local mainPanel = Instance.new("Frame")
-    mainPanel.Name = "MainPanel"
-    mainPanel.Size = UDim2.new(0, 350, 0, 500)
-    mainPanel.Position = UDim2.new(0.5, -175, 0.5, -250)
-    mainPanel.BackgroundColor3 = Color3.new(0.05, 0.05, 0.1)
-    mainPanel.BackgroundTransparency = 0.15
-    mainPanel.BorderSizePixel = 3
-    mainPanel.BorderColor3 = Color3.new(0, 0.5, 1)
-    mainPanel.Visible = false
-    mainPanel.Parent = screenGui
+    -- ===== ГЛАВНАЯ ПАНЕЛЬ =====
+    local Main = Instance.new("Frame")
+    Main.Size = UDim2.new(0, 350, 0, 500)
+    Main.Position = UDim2.new(0.5, -175, 0.5, -250)
+    Main.BackgroundColor3 = Color3.new(0.05, 0.05, 0.1)
+    Main.BackgroundTransparency = 0.15
+    Main.BorderSizePixel = 3
+    Main.BorderColor3 = Color3.new(0, 0.6, 1)
+    Main.Visible = false
+    Main.Parent = ScreenGui
     
     -- Заголовок с градиентом
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 60)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.new(0, 0.3, 0.6)
-    title.Text = "⚡ XENO SYSTEM"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.TextScaled = true
-    title.Font = Enum.Font.GothamBold
-    title.Parent = mainPanel
+    local Header = Instance.new("Frame")
+    Header.Size = UDim2.new(1, 0, 0, 55)
+    Header.BackgroundColor3 = Color3.new(0, 0.3, 0.6)
+    Header.Parent = Main
     
-    -- Информация об уровне
-    local levelInfo = Instance.new("Frame")
-    levelInfo.Size = UDim2.new(0.9, 0, 0, 90)
-    levelInfo.Position = UDim2.new(0.05, 0, 0, 70)
-    levelInfo.BackgroundColor3 = Color3.new(0.1, 0.1, 0.2)
-    levelInfo.BorderSizePixel = 2
-    levelInfo.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
-    levelInfo.Parent = mainPanel
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 1, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "⚡ XENO SYSTEM v7.0"
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.TextScaled = true
+    Title.Font = Enum.Font.GothamBold
+    Title.Parent = Header
     
-    local levelName = Instance.new("TextLabel")
-    levelName.Name = "LevelName"
-    levelName.Size = UDim2.new(1, 0, 0.4, 0)
-    levelName.Position = UDim2.new(0, 0, 0, 5)
-    levelName.BackgroundTransparency = 1
-    levelName.Text = "Light Xeno"
-    levelName.TextColor3 = Color3.new(1, 1, 1)
-    levelName.TextScaled = true
-    levelName.Font = Enum.Font.GothamBold
-    levelName.Parent = levelInfo
+    -- Инфо панель
+    local Info = Instance.new("Frame")
+    Info.Size = UDim2.new(0.92, 0, 0, 90)
+    Info.Position = UDim2.new(0.04, 0, 0, 65)
+    Info.BackgroundColor3 = Color3.new(0.1, 0.1, 0.2)
+    Info.BorderSizePixel = 2
+    Info.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+    Info.Parent = Main
     
-    local levelStats = Instance.new("TextLabel")
-    levelStats.Name = "LevelStats"
-    levelStats.Size = UDim2.new(1, 0, 0.4, 0)
-    levelStats.Position = UDim2.new(0, 0, 0.4, 0)
-    levelStats.BackgroundTransparency = 1
-    levelStats.Text = "❤️ 100 | ⚡ 20 | 🛡️ 50"
-    levelStats.TextColor3 = Color3.new(0.7, 0.7, 0.7)
-    levelStats.TextScaled = true
-    levelStats.Font = Enum.Font.Gotham
-    levelStats.Parent = levelInfo
+    local LvlName = Instance.new("TextLabel")
+    LvlName.Name = "LvlName"
+    LvlName.Size = UDim2.new(1, 0, 0.4, 0)
+    LvlName.Position = UDim2.new(0, 0, 0, 5)
+    LvlName.BackgroundTransparency = 1
+    LvlName.Text = "Light Xeno"
+    LvlName.TextColor3 = Color3.new(1, 1, 1)
+    LvlName.TextScaled = true
+    LvlName.Font = Enum.Font.GothamBold
+    LvlName.Parent = Info
     
-    -- Кнопки
-    local equipBtn = Instance.new("TextButton")
-    equipBtn.Name = "EquipBtn"
-    equipBtn.Size = UDim2.new(0.9, 0, 0, 45)
-    equipBtn.Position = UDim2.new(0.05, 0, 0, 175)
-    equipBtn.BackgroundColor3 = Color3.new(0, 0.5, 1)
-    equipBtn.Text = "🔧 Надеть Xeno"
-    equipBtn.TextColor3 = Color3.new(1, 1, 1)
-    equipBtn.Font = Enum.Font.GothamBold
-    equipBtn.TextScaled = true
-    equipBtn.Parent = mainPanel
+    local LvlStats = Instance.new("TextLabel")
+    LvlStats.Name = "LvlStats"
+    LvlStats.Size = UDim2.new(1, 0, 0.4, 0)
+    LvlStats.Position = UDim2.new(0, 0, 0.4, 0)
+    LvlStats.BackgroundTransparency = 1
+    LvlStats.Text = "❤️ 150 | ⚡ 20 | 🛡️ 50 | 💥 10"
+    LvlStats.TextColor3 = Color3.new(0.7, 0.7, 0.7)
+    LvlStats.TextScaled = true
+    LvlStats.Font = Enum.Font.Gotham
+    LvlStats.Parent = Info
     
-    local unequipBtn = Instance.new("TextButton")
-    unequipBtn.Name = "UnequipBtn"
-    unequipBtn.Size = UDim2.new(0.9, 0, 0, 45)
-    unequipBtn.Position = UDim2.new(0.05, 0, 0, 225)
-    unequipBtn.BackgroundColor3 = Color3.new(1, 0.2, 0.2)
-    unequipBtn.Text = "❌ Снять Xeno"
-    unequipBtn.TextColor3 = Color3.new(1, 1, 1)
-    unequipBtn.Font = Enum.Font.GothamBold
-    unequipBtn.TextScaled = true
-    unequipBtn.Parent = mainPanel
+    -- Кнопки управления
+    local BtnEquip = Instance.new("TextButton")
+    BtnEquip.Name = "BtnEquip"
+    BtnEquip.Size = UDim2.new(0.9, 0, 0, 42)
+    BtnEquip.Position = UDim2.new(0.05, 0, 0, 170)
+    BtnEquip.BackgroundColor3 = Color3.new(0, 0.5, 1)
+    BtnEquip.Text = "🔧 Надеть Xeno"
+    BtnEquip.TextColor3 = Color3.new(1, 1, 1)
+    BtnEquip.Font = Enum.Font.GothamBold
+    BtnEquip.TextScaled = true
+    BtnEquip.Parent = Main
     
-    local upgradeBtn = Instance.new("TextButton")
-    upgradeBtn.Name = "UpgradeBtn"
-    upgradeBtn.Size = UDim2.new(0.9, 0, 0, 45)
-    upgradeBtn.Position = UDim2.new(0.05, 0, 0, 275)
-    upgradeBtn.BackgroundColor3 = Color3.new(0.8, 0.6, 0)
-    upgradeBtn.Text = "⬆️ Улучшить (Level 2)"
-    upgradeBtn.TextColor3 = Color3.new(1, 1, 1)
-    upgradeBtn.Font = Enum.Font.GothamBold
-    upgradeBtn.TextScaled = true
-    upgradeBtn.Parent = mainPanel
+    local BtnUnequip = Instance.new("TextButton")
+    BtnUnequip.Name = "BtnUnequip"
+    BtnUnequip.Size = UDim2.new(0.9, 0, 0, 42)
+    BtnUnequip.Position = UDim2.new(0.05, 0, 0, 218)
+    BtnUnequip.BackgroundColor3 = Color3.new(1, 0.2, 0.2)
+    BtnUnequip.Text = "❌ Снять Xeno"
+    BtnUnequip.TextColor3 = Color3.new(1, 1, 1)
+    BtnUnequip.Font = Enum.Font.GothamBold
+    BtnUnequip.TextScaled = true
+    BtnUnequip.Parent = Main
     
-    -- Статистика
-    local statsFrame = Instance.new("Frame")
-    statsFrame.Size = UDim2.new(0.9, 0, 0, 80)
-    statsFrame.Position = UDim2.new(0.05, 0, 0, 330)
-    statsFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.2)
-    statsFrame.BorderSizePixel = 2
-    statsFrame.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
-    statsFrame.Parent = mainPanel
+    local BtnUpgrade = Instance.new("TextButton")
+    BtnUpgrade.Name = "BtnUpgrade"
+    BtnUpgrade.Size = UDim2.new(0.9, 0, 0, 42)
+    BtnUpgrade.Position = UDim2.new(0.05, 0, 0, 266)
+    BtnUpgrade.BackgroundColor3 = Color3.new(0.8, 0.6, 0)
+    BtnUpgrade.Text = "⬆️ Улучшить (Level 2)"
+    BtnUpgrade.TextColor3 = Color3.new(1, 1, 1)
+    BtnUpgrade.Font = Enum.Font.GothamBold
+    BtnUpgrade.TextScaled = true
+    BtnUpgrade.Parent = Main
     
-    local shieldStat = Instance.new("TextLabel")
-    shieldStat.Name = "ShieldStat"
-    shieldStat.Size = UDim2.new(1, 0, 0.4, 0)
-    shieldStat.Position = UDim2.new(0, 0, 0, 5)
-    shieldStat.BackgroundTransparency = 1
-    shieldStat.Text = "🛡️ Щит: 50/50"
-    shieldStat.TextColor3 = Color3.new(0.5, 0.8, 1)
-    shieldStat.TextScaled = true
-    shieldStat.Font = Enum.Font.Gotham
-    shieldStat.Parent = statsFrame
+    -- Статус
+    local Status = Instance.new("Frame")
+    Status.Size = UDim2.new(0.92, 0, 0, 85)
+    Status.Position = UDim2.new(0.04, 0, 0, 320)
+    Status.BackgroundColor3 = Color3.new(0.1, 0.1, 0.2)
+    Status.BorderSizePixel = 2
+    Status.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+    Status.Parent = Main
     
-    local statusStat = Instance.new("TextLabel")
-    statusStat.Name = "StatusStat"
-    statusStat.Size = UDim2.new(1, 0, 0.4, 0)
-    statusStat.Position = UDim2.new(0, 0, 0.4, 0)
-    statusStat.BackgroundTransparency = 1
-    statusStat.Text = "❌ Не надет"
-    statusStat.TextColor3 = Color3.new(1, 0.3, 0.3)
-    statusStat.TextScaled = true
-    statusStat.Font = Enum.Font.Gotham
-    statusStat.Parent = statsFrame
+    local ShieldText = Instance.new("TextLabel")
+    ShieldText.Name = "ShieldText"
+    ShieldText.Size = UDim2.new(1, 0, 0.4, 0)
+    ShieldText.Position = UDim2.new(0, 0, 0, 5)
+    ShieldText.BackgroundTransparency = 1
+    ShieldText.Text = "🛡️ Щит: 50/50"
+    ShieldText.TextColor3 = Color3.new(0.5, 0.8, 1)
+    ShieldText.TextScaled = true
+    ShieldText.Font = Enum.Font.Gotham
+    ShieldText.Parent = Status
     
-    -- ПАНЕЛЬ СПОСОБНОСТЕЙ
-    local abilityPanel = Instance.new("Frame")
-    abilityPanel.Name = "AbilityPanel"
-    abilityPanel.Size = UDim2.new(0, 280, 0, 220)
-    abilityPanel.Position = UDim2.new(1, 10, 0.5, -110)
-    abilityPanel.BackgroundColor3 = Color3.new(0.05, 0.05, 0.1)
-    abilityPanel.BackgroundTransparency = 0.2
-    abilityPanel.BorderSizePixel = 2
-    abilityPanel.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-    abilityPanel.Visible = false
-    abilityPanel.Parent = screenGui
+    local EquipText = Instance.new("TextLabel")
+    EquipText.Name = "EquipText"
+    EquipText.Size = UDim2.new(1, 0, 0.4, 0)
+    EquipText.Position = UDim2.new(0, 0, 0.4, 0)
+    EquipText.BackgroundTransparency = 1
+    EquipText.Text = "❌ Не надет"
+    EquipText.TextColor3 = Color3.new(1, 0.3, 0.3)
+    EquipText.TextScaled = true
+    EquipText.Font = Enum.Font.Gotham
+    EquipText.Parent = Status
     
-    local abTitle = Instance.new("TextLabel")
-    abTitle.Size = UDim2.new(1, 0, 0, 35)
-    abTitle.Position = UDim2.new(0, 0, 0, 5)
-    abTitle.BackgroundTransparency = 1
-    abTitle.Text = "⚡ СПОСОБНОСТИ"
-    abTitle.TextColor3 = Color3.new(1, 1, 1)
-    abTitle.TextScaled = true
-    abTitle.Font = Enum.Font.GothamBold
-    abTitle.Parent = abilityPanel
+    -- ===== ПАНЕЛЬ СПОСОБНОСТЕЙ =====
+    local AbilPanel = Instance.new("Frame")
+    AbilPanel.Name = "AbilPanel"
+    AbilPanel.Size = UDim2.new(0, 280, 0, 260)
+    AbilPanel.Position = UDim2.new(1, 15, 0.5, -130)
+    AbilPanel.BackgroundColor3 = Color3.new(0.05, 0.05, 0.1)
+    AbilPanel.BackgroundTransparency = 0.2
+    AbilPanel.BorderSizePixel = 2
+    AbilPanel.BorderColor3 = Color3.new(0.4, 0.4, 0.4)
+    AbilPanel.Visible = false
+    AbilPanel.Parent = ScreenGui
     
-    local abilityButtons = {}
-    local yPos = 45
-    for name, ability in pairs(CONFIG.Abilities) do
+    local AbTitle = Instance.new("TextLabel")
+    AbTitle.Size = UDim2.new(1, 0, 0, 35)
+    AbTitle.Position = UDim2.new(0, 0, 0, 5)
+    AbTitle.BackgroundTransparency = 1
+    AbTitle.Text = "⚡ СПОСОБНОСТИ"
+    AbTitle.TextColor3 = Color3.new(1, 1, 1)
+    AbTitle.TextScaled = true
+    AbTitle.Font = Enum.Font.GothamBold
+    AbTitle.Parent = AbilPanel
+    
+    local AbilityBtns = {}
+    local y = 45
+    for name, ability in pairs(Xeno.Abilities) do
         local btn = Instance.new("TextButton")
         btn.Name = name .. "Btn"
-        btn.Size = UDim2.new(0.9, 0, 0, 35)
-        btn.Position = UDim2.new(0.05, 0, 0, yPos)
+        btn.Size = UDim2.new(0.92, 0, 0, 36)
+        btn.Position = UDim2.new(0.04, 0, 0, y)
         btn.BackgroundColor3 = Color3.new(0.2, 0.2, 0.3)
         btn.Text = ability.Name .. " [Готов]"
         btn.TextColor3 = Color3.new(1, 1, 1)
         btn.Font = Enum.Font.Gotham
         btn.TextScaled = true
-        btn.Parent = abilityPanel
-        
-        abilityButtons[name] = btn
-        yPos = yPos + 40
+        btn.Parent = AbilPanel
+        AbilityBtns[name] = btn
+        y = y + 42
     end
     
-    -- ИНДИКАТОР ЩИТА
-    local shieldIndicator = Instance.new("Frame")
-    shieldIndicator.Name = "ShieldIndicator"
-    shieldIndicator.Size = UDim2.new(0, 300, 0, 45)
-    shieldIndicator.Position = UDim2.new(0.5, -150, 0.92, 0)
-    shieldIndicator.BackgroundColor3 = Color3.new(0, 0, 0)
-    shieldIndicator.BackgroundTransparency = 0.4
-    shieldIndicator.BorderSizePixel = 2
-    shieldIndicator.BorderColor3 = Color3.new(0, 0.5, 1)
-    shieldIndicator.Visible = false
-    shieldIndicator.Parent = screenGui
+    local HotkeyInfo = Instance.new("TextLabel")
+    HotkeyInfo.Size = UDim2.new(1, 0, 0, 20)
+    HotkeyInfo.Position = UDim2.new(0, 0, 0, y)
+    HotkeyInfo.BackgroundTransparency = 1
+    HotkeyInfo.Text = "Клавиши: 1-5 | X - меню"
+    HotkeyInfo.TextColor3 = Color3.new(0.5, 0.5, 0.5)
+    HotkeyInfo.TextScaled = true
+    HotkeyInfo.Font = Enum.Font.Gotham
+    HotkeyInfo.Parent = AbilPanel
     
-    local shieldIcon = Instance.new("TextLabel")
-    shieldIcon.Size = UDim2.new(0.1, 0, 1, 0)
-    shieldIcon.Position = UDim2.new(0.02, 0, 0, 0)
-    shieldIcon.BackgroundTransparency = 1
-    shieldIcon.Text = "🛡️"
-    shieldIcon.TextColor3 = Color3.new(1, 1, 1)
-    shieldIcon.TextScaled = true
-    shieldIcon.Font = Enum.Font.Gotham
-    shieldIcon.Parent = shieldIndicator
+    -- ===== ИНДИКАТОР ЩИТА =====
+    local ShieldInd = Instance.new("Frame")
+    ShieldInd.Name = "ShieldInd"
+    ShieldInd.Size = UDim2.new(0, 320, 0, 40)
+    ShieldInd.Position = UDim2.new(0.5, -160, 0.92, 0)
+    ShieldInd.BackgroundColor3 = Color3.new(0, 0, 0)
+    ShieldInd.BackgroundTransparency = 0.4
+    ShieldInd.BorderSizePixel = 2
+    ShieldInd.BorderColor3 = Color3.new(0, 0.5, 1)
+    ShieldInd.Visible = false
+    ShieldInd.Parent = ScreenGui
     
-    local shieldBar = Instance.new("Frame")
-    shieldBar.Name = "ShieldBar"
-    shieldBar.Size = UDim2.new(0.7, 0, 0.7, 0)
-    shieldBar.Position = UDim2.new(0.15, 0, 0.15, 0)
-    shieldBar.BackgroundColor3 = Color3.new(0.1, 0.1, 0.2)
-    shieldBar.BorderSizePixel = 1
-    shieldBar.Parent = shieldIndicator
+    local ShieldIcon = Instance.new("TextLabel")
+    ShieldIcon.Size = UDim2.new(0.1, 0, 1, 0)
+    ShieldIcon.Position = UDim2.new(0.02, 0, 0, 0)
+    ShieldIcon.BackgroundTransparency = 1
+    ShieldIcon.Text = "🛡️"
+    ShieldIcon.TextColor3 = Color3.new(1, 1, 1)
+    ShieldIcon.TextScaled = true
+    ShieldIcon.Font = Enum.Font.Gotham
+    ShieldIcon.Parent = ShieldInd
     
-    local shieldFill = Instance.new("Frame")
-    shieldFill.Name = "ShieldFill"
-    shieldFill.Size = UDim2.new(1, 0, 1, 0)
-    shieldFill.BackgroundColor3 = Color3.new(0, 0.8, 1)
-    shieldFill.BorderSizePixel = 0
-    shieldFill.Parent = shieldBar
+    local ShieldBar = Instance.new("Frame")
+    ShieldBar.Size = UDim2.new(0.7, 0, 0.7, 0)
+    ShieldBar.Position = UDim2.new(0.14, 0, 0.15, 0)
+    ShieldBar.BackgroundColor3 = Color3.new(0.1, 0.1, 0.2)
+    ShieldBar.BorderSizePixel = 1
+    ShieldBar.Parent = ShieldInd
     
-    local shieldText = Instance.new("TextLabel")
-    shieldText.Name = "ShieldText"
-    shieldText.Size = UDim2.new(0.2, 0, 1, 0)
-    shieldText.Position = UDim2.new(0.78, 0, 0, 0)
-    shieldText.BackgroundTransparency = 1
-    shieldText.Text = "100/100"
-    shieldText.TextColor3 = Color3.new(1, 1, 1)
-    shieldText.TextScaled = true
-    shieldText.Font = Enum.Font.Gotham
-    shieldText.Parent = shieldIndicator
+    local ShieldFill = Instance.new("Frame")
+    ShieldFill.Name = "ShieldFill"
+    ShieldFill.Size = UDim2.new(1, 0, 1, 0)
+    ShieldFill.BackgroundColor3 = Color3.new(0, 0.8, 1)
+    ShieldFill.BorderSizePixel = 0
+    ShieldFill.Parent = ShieldBar
     
-    -- Сохраняем UI
-    UI = {
-        ScreenGui = screenGui,
-        MainPanel = mainPanel,
-        AbilityPanel = abilityPanel,
-        ShieldIndicator = shieldIndicator,
-        LevelName = levelName,
-        LevelStats = levelStats,
-        ShieldStat = shieldStat,
-        StatusStat = statusStat,
-        ShieldFill = shieldFill,
-        ShieldText = shieldText,
-        EquipBtn = equipBtn,
-        UnequipBtn = unequipBtn,
-        UpgradeBtn = upgradeBtn,
-        AbilityButtons = abilityButtons
+    local ShieldNum = Instance.new("TextLabel")
+    ShieldNum.Name = "ShieldNum"
+    ShieldNum.Size = UDim2.new(0.2, 0, 1, 0)
+    ShieldNum.Position = UDim2.new(0.78, 0, 0, 0)
+    ShieldNum.BackgroundTransparency = 1
+    ShieldNum.Text = "100/100"
+    ShieldNum.TextColor3 = Color3.new(1, 1, 1)
+    ShieldNum.TextScaled = true
+    ShieldNum.Font = Enum.Font.Gotham
+    ShieldNum.Parent = ShieldBar
+    
+    return {
+        ScreenGui = ScreenGui,
+        Main = Main,
+        AbilPanel = AbilPanel,
+        ShieldInd = ShieldInd,
+        LvlName = LvlName,
+        LvlStats = LvlStats,
+        ShieldText = ShieldText,
+        EquipText = EquipText,
+        ShieldFill = ShieldFill,
+        ShieldNum = ShieldNum,
+        BtnEquip = BtnEquip,
+        BtnUnequip = BtnUnequip,
+        BtnUpgrade = BtnUpgrade,
+        AbilityBtns = AbilityBtns
     }
-    
-    setupButtons()
 end
 
--- ============================================
--- НАСТРОЙКА КНОПОК
--- ============================================
-
-local function setupButtons()
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.X then
-            UI.MainPanel.Visible = not UI.MainPanel.Visible
-            UI.AbilityPanel.Visible = UI.MainPanel.Visible
-            updateUI()
-        end
-    end)
-    
-    UI.EquipBtn.MouseButton1Click:Connect(function()
-        equipXeno()
-    end)
-    
-    UI.UnequipBtn.MouseButton1Click:Connect(function()
-        unequipXeno()
-    end)
-    
-    UI.UpgradeBtn.MouseButton1Click:Connect(function()
-        upgradeXeno()
-    end)
-    
-    for name, btn in pairs(UI.AbilityButtons) do
-        btn.MouseButton1Click:Connect(function()
-            useAbility(name)
-        end)
-    end
-    
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if not XenoData.Equipped then return end
-        
-        for name, ability in pairs(CONFIG.Abilities) do
-            if input.KeyCode == ability.Key then
-                useAbility(name)
-            end
-        end
-    end)
-end
+local UI = CreateUI()
 
 -- ============================================
--- ОСНОВНЫЕ ФУНКЦИИ
+-- ФУНКЦИИ УПРАВЛЕНИЯ
 -- ============================================
 
-local function updateUI()
-    local config = CONFIG.Levels[XenoData.Level]
-    if not config then return end
+local function UpdateUI()
+    local lvl = Xeno.Levels[Xeno.Level]
+    UI.LvlName.Text = lvl.Name
+    UI.LvlName.TextColor3 = lvl.Color
+    UI.LvlStats.Text = string.format("❤️ %d | ⚡ %d | 🛡️ %d | 💥 %d", 
+        lvl.Health, lvl.Speed, lvl.Shield, lvl.Power)
+    UI.ShieldText.Text = string.format("🛡️ Щит: %d/%d", Xeno.Shield, Xeno.MaxShield)
+    UI.EquipText.Text = Xeno.Equipped and "✅ Надет" or "❌ Не надет"
+    UI.EquipText.TextColor3 = Xeno.Equipped and Color3.new(0, 1, 0) or Color3.new(1, 0.3, 0.3)
     
-    UI.LevelName.Text = config.Name
-    UI.LevelName.TextColor3 = config.Color
-    UI.LevelStats.Text = string.format("❤️ %d | ⚡ %d | 🛡️ %d", 
-        config.Health, config.Speed, config.Shield)
-    
-    UI.ShieldStat.Text = string.format("🛡️ Щит: %d/%d", 
-        XenoData.Shield, XenoData.MaxShield)
-    
-    UI.StatusStat.Text = XenoData.Equipped and "✅ Надет" or "❌ Не надет"
-    UI.StatusStat.TextColor3 = XenoData.Equipped and Color3.new(0, 1, 0) or Color3.new(1, 0.3, 0.3)
-    
-    local nextLevel = XenoData.Level + 1
-    if nextLevel <= 5 then
-        UI.UpgradeBtn.Text = string.format("⬆️ Улучшить до %s", CONFIG.Levels[nextLevel].Name)
-        UI.UpgradeBtn.Visible = true
+    local nextLvl = Xeno.Level + 1
+    if nextLvl <= 5 then
+        UI.BtnUpgrade.Text = string.format("⬆️ Улучшить до %s", Xeno.Levels[nextLvl].Name)
+        UI.BtnUpgrade.Visible = true
     else
-        UI.UpgradeBtn.Text = "⭐ MAX LEVEL"
-        UI.UpgradeBtn.Visible = true
+        UI.BtnUpgrade.Text = "⭐ MAX LEVEL"
+        UI.BtnUpgrade.Visible = true
     end
     
-    if XenoData.Equipped then
-        UI.ShieldIndicator.Visible = true
-        local percent = XenoData.Shield / XenoData.MaxShield
-        UI.ShieldFill.Size = UDim2.new(percent, 0, 1, 0)
-        UI.ShieldText.Text = string.format("%d/%d", 
-            math.floor(XenoData.Shield), XenoData.MaxShield)
+    if Xeno.Equipped then
+        UI.ShieldInd.Visible = true
+        local percent = Xeno.Shield / Xeno.MaxShield
+        UI.ShieldFill.Size = UDim2.new(math.clamp(percent, 0, 1), 0, 1, 0)
+        UI.ShieldNum.Text = string.format("%d/%d", math.floor(Xeno.Shield), Xeno.MaxShield)
         
-        -- Меняем цвет щита в зависимости от процентов
         if percent > 0.5 then
             UI.ShieldFill.BackgroundColor3 = Color3.new(0, 0.8, 1)
         elseif percent > 0.25 then
@@ -441,151 +341,167 @@ local function updateUI()
             UI.ShieldFill.BackgroundColor3 = Color3.new(1, 0, 0)
         end
     else
-        UI.ShieldIndicator.Visible = false
+        UI.ShieldInd.Visible = false
     end
     
-    for name, btn in pairs(UI.AbilityButtons) do
-        local ability = XenoData.Abilities[name]
-        local config = CONFIG.Abilities[name]
-        if ability.Cooldown > 0 then
-            btn.Text = string.format("%s [⏳ %ds]", config.Name, math.ceil(ability.Cooldown))
+    for name, btn in pairs(UI.AbilityBtns) do
+        local ab = Abilities[name]
+        local config = Xeno.Abilities[name]
+        if ab.Cooldown > 0 then
+            btn.Text = string.format("%s [⏳ %ds]", config.Name, math.ceil(ab.Cooldown))
             btn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+        elseif ab.Active then
+            btn.Text = string.format("%s [⚡ ACTIVE]", config.Name)
+            btn.BackgroundColor3 = Color3.new(0, 0.8, 0)
         else
             btn.Text = string.format("%s [✅ Готов]", config.Name)
-            btn.BackgroundColor3 = Color3.new(0, 0.5, 0)
+            btn.BackgroundColor3 = Color3.new(0.2, 0.2, 0.3)
         end
     end
 end
 
-local function notify(message, color)
-    local notification = Instance.new("Frame")
-    notification.Size = UDim2.new(0, 0, 0, 0)
-    notification.Position = UDim2.new(0.5, -200, 0.8, 0)
-    notification.BackgroundColor3 = Color3.new(0, 0, 0)
-    notification.BackgroundTransparency = 0.5
-    notification.BorderSizePixel = 2
-    notification.BorderColor3 = color or Color3.new(1, 1, 1)
-    notification.Parent = Player.PlayerGui
+local function Notify(text, color)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 0, 0, 0)
+    frame.Position = UDim2.new(0.5, -220, 0.8, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    frame.BackgroundTransparency = 0.5
+    frame.BorderSizePixel = 2
+    frame.BorderColor3 = color or Color3.new(1, 1, 1)
+    frame.Parent = UI.ScreenGui
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = message
+    label.Text = text
     label.TextColor3 = Color3.new(1, 1, 1)
     label.TextScaled = true
     label.Font = Enum.Font.GothamBold
-    label.Parent = notification
+    label.Parent = frame
     
-    TweenService:Create(notification, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-        Size = UDim2.new(0, 400, 0, 50)
+    TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(0, 440, 0, 50)
     }):Play()
     
     task.wait(3)
     
-    TweenService:Create(notification, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+    TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
         Size = UDim2.new(0, 0, 0, 0)
     }):Play()
     task.wait(0.3)
-    notification:Destroy()
+    frame:Destroy()
 end
 
 -- ============================================
 -- XENO ФУНКЦИИ
 -- ============================================
 
-local function equipXeno()
-    if XenoData.Equipped then
-        notify("⚠️ Xeno уже надет!", Color3.new(1, 1, 0))
+local function EquipXeno()
+    if Xeno.Equipped then
+        Notify("⚠️ Xeno уже надет!", Color3.new(1, 1, 0))
         return
     end
     
-    local config = CONFIG.Levels[XenoData.Level]
-    local character = Player.Character
-    if not character then
-        notify("❌ Персонаж не найден!", Color3.new(1, 0, 0))
+    local char = Player.Character
+    if not char then
+        Notify("❌ Персонаж не найден!", Color3.new(1, 0, 0))
         return
     end
     
-    -- Создаем части Xeno
-    for _, part in pairs(character:GetChildren()) do
+    local lvl = Xeno.Levels[Xeno.Level]
+    
+    -- Очистка старых частей
+    for _, part in pairs(char:GetChildren()) do
         if part.Name == "XenoPart" then
             part:Destroy()
         end
     end
-    
-    local xenoPart = Instance.new("Part")
-    xenoPart.Name = "XenoPart"
-    xenoPart.Size = Vector3.new(3, 1, 3)
-    xenoPart.Shape = Enum.PartType.Ball
-    xenoPart.Material = Enum.Material.Neon
-    xenoPart.Color = config.Color
-    xenoPart.Transparency = 0.3
-    xenoPart.Anchored = false
-    xenoPart.CanCollide = false
-    
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if root then
-        local weld = Instance.new("Weld")
-        weld.Part0 = root
-        weld.Part1 = xenoPart
-        weld.C0 = CFrame.new(0, 1.5, 0)
-        weld.Parent = xenoPart
+    for _, conn in pairs(Connections) do
+        pcall(function() conn:Disconnect() end)
     end
+    Connections = {}
+    XenoParts = {}
     
-    xenoPart.Parent = character
-    
-    local light = Instance.new("PointLight")
-    light.Range = 15
-    light.Brightness = 3
-    light.Color = config.Color
-    light.Parent = xenoPart
-    
-    local connection = RunService.RenderStepped:Connect(function()
-        if not xenoPart.Parent then
-            connection:Disconnect()
-            return
-        end
-        local float = math.sin(tick() * 2) * 0.2
-        if root then
-            xenoPart.Position = root.Position + Vector3.new(0, 1.5 + float, 0)
-            xenoPart.Orientation = Vector3.new(0, tick() * 50 % 360, 0)
-        end
-    end)
-    
-    table.insert(XenoParts, xenoPart)
-    table.insert(Connections, connection)
-    
-    XenoData.Equipped = true
-    XenoData.Shield = config.Shield
-    XenoData.MaxShield = config.Shield
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then
-        humanoid.MaxHealth = config.Health
-        humanoid.Health = config.Health
-        humanoid.WalkSpeed = config.Speed
-        humanoid.JumpPower = config.JumpPower
-    end
-    
-    notify("✅ Xeno надет!", Color3.new(0, 1, 0))
-    updateUI()
-end
-
-local function unequipXeno()
-    if not XenoData.Equipped then
-        notify("⚠️ Xeno не надет!", Color3.new(1, 1, 0))
+    -- Создание Xeno
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then
+        Notify("❌ RootPart не найден!", Color3.new(1, 0, 0))
         return
     end
     
-    local character = Player.Character
-    if character then
-        for _, part in pairs(character:GetChildren()) do
+    local xeno = Instance.new("Part")
+    xeno.Name = "XenoPart"
+    xeno.Size = Vector3.new(3.5, 1.2, 3.5)
+    xeno.Shape = Enum.PartType.Ball
+    xeno.Material = Enum.Material.Neon
+    xeno.Color = lvl.Color
+    xeno.Transparency = 0.25
+    xeno.Anchored = false
+    xeno.CanCollide = false
+    
+    local weld = Instance.new("Weld")
+    weld.Part0 = root
+    weld.Part1 = xeno
+    weld.C0 = CFrame.new(0, 1.8, 0)
+    weld.Parent = xeno
+    
+    xeno.Parent = char
+    table.insert(XenoParts, xeno)
+    
+    -- Свет
+    local light = Instance.new("PointLight")
+    light.Range = 18
+    light.Brightness = 4
+    light.Color = lvl.Color
+    light.Parent = xeno
+    
+    -- Анимация
+    local conn = RunService.RenderStepped:Connect(function()
+        if not xeno.Parent then
+            conn:Disconnect()
+            return
+        end
+        local float = math.sin(tick() * 2.5) * 0.25
+        local rot = tick() * 45
+        if root then
+            xeno.Position = root.Position + Vector3.new(0, 1.8 + float, 0)
+            xeno.Orientation = Vector3.new(0, rot % 360, 0)
+        end
+    end)
+    table.insert(Connections, conn)
+    
+    -- Применение статов
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.MaxHealth = lvl.Health
+        humanoid.Health = lvl.Health
+        humanoid.WalkSpeed = lvl.Speed
+        humanoid.JumpPower = lvl.JumpPower
+    end
+    
+    Xeno.Equipped = true
+    Xeno.Shield = lvl.Shield
+    Xeno.MaxShield = lvl.Shield
+    
+    Notify("✅ Xeno надет! (" .. lvl.Name .. ")", Color3.new(0, 1, 0))
+    UpdateUI()
+end
+
+local function UnequipXeno()
+    if not Xeno.Equipped then
+        Notify("⚠️ Xeno не надет!", Color3.new(1, 1, 0))
+        return
+    end
+    
+    local char = Player.Character
+    if char then
+        for _, part in pairs(char:GetChildren()) do
             if part.Name == "XenoPart" then
                 part:Destroy()
             end
         end
         
-        local humanoid = character:FindFirstChild("Humanoid")
+        local humanoid = char:FindFirstChild("Humanoid")
         if humanoid then
             humanoid.MaxHealth = 100
             humanoid.Health = 100
@@ -595,147 +511,240 @@ local function unequipXeno()
     end
     
     for _, conn in pairs(Connections) do
-        conn:Disconnect()
+        pcall(function() conn:Disconnect() end)
     end
     Connections = {}
     XenoParts = {}
     
-    XenoData.Equipped = false
-    XenoData.Shield = 0
+    Xeno.Equipped = false
+    Xeno.Shield = 0
     
-    notify("❌ Xeno снят!", Color3.new(1, 0, 0))
-    updateUI()
+    Notify("❌ Xeno снят!", Color3.new(1, 0, 0))
+    UpdateUI()
 end
 
-local function upgradeXeno()
-    local nextLevel = XenoData.Level + 1
-    if nextLevel > 5 then
-        notify("⭐ У вас максимальный уровень!", Color3.new(1, 1, 0))
+local function UpgradeXeno()
+    local nextLvl = Xeno.Level + 1
+    if nextLvl > 5 then
+        Notify("⭐ У вас максимальный уровень!", Color3.new(1, 1, 0))
         return
     end
     
-    XenoData.Level = nextLevel
+    Xeno.Level = nextLvl
     
-    if XenoData.Equipped then
-        unequipXeno()
-        task.wait(0.5)
-        equipXeno()
+    if Xeno.Equipped then
+        UnequipXeno()
+        task.wait(0.3)
+        EquipXeno()
     end
     
-    notify(string.format("⬆️ Улучшено до %s!", CONFIG.Levels[nextLevel].Name), Color3.new(0, 1, 0))
-    updateUI()
+    Notify(string.format("⬆️ Улучшено до %s!", Xeno.Levels[nextLvl].Name), Color3.new(0, 1, 0))
+    UpdateUI()
 end
 
-local function useAbility(name)
-    if not XenoData.Equipped then
-        notify("❌ Наденьте Xeno!", Color3.new(1, 0, 0))
+local function UseAbility(name)
+    if not Xeno.Equipped then
+        Notify("❌ Наденьте Xeno!", Color3.new(1, 0, 0))
         return
     end
     
-    local ability = XenoData.Abilities[name]
-    local config = CONFIG.Abilities[name]
+    local ab = Abilities[name]
+    local config = Xeno.Abilities[name]
     
-    if ability.Cooldown > 0 then
-        notify(string.format("⏳ Перезарядка %ds", math.ceil(ability.Cooldown)), Color3.new(1, 1, 0))
+    if ab.Cooldown > 0 then
+        Notify(string.format("⏳ Перезарядка %ds", math.ceil(ab.Cooldown)), Color3.new(1, 1, 0))
         return
     end
     
-    if ability.Active then
-        notify("⚠️ Способность активна!", Color3.new(1, 1, 0))
+    if ab.Active then
+        Notify("⚠️ Способность активна!", Color3.new(1, 1, 0))
         return
     end
     
-    local character = Player.Character
-    if not character then return end
+    local char = Player.Character
+    if not char then return end
     
-    local humanoid = character:FindFirstChild("Humanoid")
+    local humanoid = char:FindFirstChild("Humanoid")
     if not humanoid then return end
     
-    ability.Active = true
-    ability.Cooldown = config.Cooldown
+    ab.Active = true
+    ab.Cooldown = config.Cooldown
+    ab.Timer = config.Duration or 0
     
     if name == "ShieldBoost" then
-        local boost = XenoData.MaxShield * config.Multiplier
-        XenoData.MaxShield = boost
-        XenoData.Shield = boost
-        notify(string.format("🛡️ Щит увеличен до %d!", boost), Color3.new(0, 0.5, 1))
+        local boost = Xeno.MaxShield * 2
+        Xeno.MaxShield = boost
+        Xeno.Shield = boost
+        Notify(string.format("🛡️ Щит увеличен до %d!", boost), Color3.new(0, 0.5, 1))
         
         task.wait(config.Duration)
-        local config2 = CONFIG.Levels[XenoData.Level]
-        XenoData.MaxShield = config2.Shield
-        XenoData.Shield = math.min(XenoData.Shield, XenoData.MaxShield)
-        ability.Active = false
-        notify("🛡️ Щит восстановлен", Color3.new(0.5, 0.5, 0.5))
+        local lvl = Xeno.Levels[Xeno.Level]
+        Xeno.MaxShield = lvl.Shield
+        Xeno.Shield = math.min(Xeno.Shield, Xeno.MaxShield)
+        ab.Active = false
+        Notify("🛡️ Щит восстановлен", Color3.new(0.5, 0.5, 0.5))
         
     elseif name == "SpeedBoost" then
-        local speed = humanoid.WalkSpeed * config.Multiplier
+        local speed = humanoid.WalkSpeed * 1.8
         humanoid.WalkSpeed = speed
-        notify(string.format("⚡ Скорость: %d", speed), Color3.new(1, 1, 0))
+        Notify(string.format("⚡ Скорость: %d", speed), Color3.new(1, 1, 0))
         
         task.wait(config.Duration)
-        humanoid.WalkSpeed = CONFIG.Levels[XenoData.Level].Speed
-        ability.Active = false
-        notify("⚡ Скорость восстановлена", Color3.new(0.5, 0.5, 0.5))
+        humanoid.WalkSpeed = Xeno.Levels[Xeno.Level].Speed
+        ab.Active = false
+        Notify("⚡ Скорость восстановлена", Color3.new(0.5, 0.5, 0.5))
         
     elseif name == "JumpBoost" then
-        local jump = humanoid.JumpPower * config.Multiplier
+        local jump = humanoid.JumpPower * 2
         humanoid.JumpPower = jump
-        notify(string.format("🚀 Прыжок: %d", jump), Color3.new(0, 1, 1))
+        Notify(string.format("🚀 Прыжок: %d", jump), Color3.new(0, 1, 1))
         
         task.wait(config.Duration)
-        humanoid.JumpPower = CONFIG.Levels[XenoData.Level].JumpPower
-        ability.Active = false
-        notify("🚀 Прыжок восстановлен", Color3.new(0.5, 0.5, 0.5))
+        humanoid.JumpPower = Xeno.Levels[Xeno.Level].JumpPower
+        ab.Active = false
+        Notify("🚀 Прыжок восстановлен", Color3.new(0.5, 0.5, 0.5))
         
     elseif name == "Heal" then
-        humanoid.Health = math.min(humanoid.Health + config.HealAmount, humanoid.MaxHealth)
-        notify(string.format("❤️ +%d здоровья", config.HealAmount), Color3.new(0, 1, 0))
-        ability.Active = false
+        local heal = 50
+        humanoid.Health = math.min(humanoid.Health + heal, humanoid.MaxHealth)
+        Notify(string.format("❤️ Восстановлено %d здоровья!", heal), Color3.new(0, 1, 0))
+        ab.Active = false
+        
+    elseif name == "Invis" then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 0.8
+            end
+        end
+        Notify("👻 Невидимость активирована!", Color3.new(0.5, 0, 1))
+        
+        task.wait(config.Duration)
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 0
+            end
+        end
+        ab.Active = false
+        Notify("👻 Невидимость деактивирована", Color3.new(0.5, 0.5, 0.5))
     end
     
-    updateUI()
+    UpdateUI()
     
     task.spawn(function()
-        while ability.Cooldown > 0 do
+        while ab.Cooldown > 0 do
             task.wait(1)
-            ability.Cooldown = ability.Cooldown - 1
-            updateUI()
+            ab.Cooldown = ab.Cooldown - 1
+            UpdateUI()
         end
-        if not ability.Active then
-            ability.Cooldown = 0
-            updateUI()
+        if not ab.Active then
+            ab.Cooldown = 0
+            UpdateUI()
         end
     end)
 end
 
 -- ============================================
--- СИСТЕМА ЩИТА
+-- НАСТРОЙКА КНОПОК
+-- ============================================
+
+local function SetupButtons()
+    -- Открытие меню (X)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.X then
+            UI.Main.Visible = not UI.Main.Visible
+            UI.AbilPanel.Visible = UI.Main.Visible
+            if UI.Main.Visible then UpdateUI() end
+        end
+    end)
+    
+    -- Кнопки
+    UI.BtnEquip.MouseButton1Click:Connect(EquipXeno)
+    UI.BtnUnequip.MouseButton1Click:Connect(UnequipXeno)
+    UI.BtnUpgrade.MouseButton1Click:Connect(UpgradeXeno)
+    
+    for name, btn in pairs(UI.AbilityBtns) do
+        btn.MouseButton1Click:Connect(function()
+            UseAbility(name)
+        end)
+    end
+    
+    -- Горячие клавиши способностей
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        for name, config in pairs(Xeno.Abilities) do
+            if input.KeyCode == config.Key then
+                UseAbility(name)
+            end
+        end
+    end)
+end
+
+SetupButtons()
+
+-- ============================================
+-- РЕГЕНЕРАЦИЯ ЩИТА
 -- ============================================
 
 task.spawn(function()
     while task.wait(2) do
-        if XenoData.Equipped and XenoData.Shield < XenoData.MaxShield then
-            XenoData.Shield = math.min(XenoData.Shield + 5, XenoData.MaxShield)
-            updateUI()
+        if Xeno.Equipped and Xeno.Shield < Xeno.MaxShield then
+            Xeno.Shield = math.min(Xeno.Shield + 5, Xeno.MaxShield)
+            UpdateUI()
         end
     end
 end)
 
 -- ============================================
+-- ЗАЩИТА ОТ УРОНА (ЩИТ)
+-- ============================================
+
+local function OnCharacterAdded(char)
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    local oldHealth = humanoid.Health
+    
+    humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+        if not Xeno.Equipped then return end
+        local damage = oldHealth - humanoid.Health
+        if damage > 0 and Xeno.Shield > 0 then
+            local shieldDmg = math.min(damage, Xeno.Shield)
+            Xeno.Shield = Xeno.Shield - shieldDmg
+            humanoid.Health = humanoid.Health + shieldDmg
+            
+            if Xeno.Shield <= 0 then
+                Xeno.Shield = 0
+                Notify("⚠️ Щит разрушен!", Color3.new(1, 0, 0))
+            end
+            UpdateUI()
+        end
+        oldHealth = humanoid.Health
+    end)
+end
+
+Player.CharacterAdded:Connect(OnCharacterAdded)
+if Player.Character then
+    OnCharacterAdded(Player.Character)
+end
+
+-- ============================================
 -- ИНИЦИАЛИЗАЦИЯ
 -- ============================================
 
-CreateUI()
-updateUI()
+UpdateUI()
 
 print("========================================")
-print("✅ XENO SYSTEM ЗАГРУЖЕН!")
+print("✅ XENO SYSTEM v7.0 ЗАГРУЖЕН!")
 print("========================================")
 print("🔥 Нажми X для открытия меню")
-print("🎮 Используй 1-4 для способностей")
+print("🎮 Клавиши способностей:")
+print("   1 - Shield Boost")
+print("   2 - Speed Boost")
+print("   3 - Jump Boost")
+print("   4 - Self Heal")
+print("   5 - Invisibility")
 print("========================================")
-print("1 - Shield Boost (Усиление щита)")
-print("2 - Speed Boost (Ускорение)")
-print("3 - Jump Boost (Супер прыжок)")
-print("4 - Self Heal (Лечение)")
+print("💡 Для обновления скрипта:")
+print("   loadstring(game:HttpGet('YOUR_URL'))()")
 print("========================================")
