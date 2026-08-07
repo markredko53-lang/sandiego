@@ -1,15 +1,14 @@
-if game.CoreGui:FindFirstChild("UltimateBypassMenu") then
-    game.CoreGui.UltimateBypassMenu:Destroy()
+if game.CoreGui:FindFirstChild("SanDiegoUltimateMenu") then
+    game.CoreGui.SanDiegoUltimateMenu:Destroy()
 end
 
--- 1. Создаем аккуратное меню
 local ui = Instance.new("ScreenGui")
-ui.Name = "UltimateBypassMenu"
+ui.Name = "SanDiegoUltimateMenu"
 ui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame")
 frame.Parent = ui
-frame.Size = UDim2.new(0, 280, 0, 110)
+frame.Size = UDim2.new(0, 300, 0, 160)
 frame.Position = UDim2.new(0.4, 0, 0.4, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 frame.Active = true
@@ -21,65 +20,91 @@ corner.Parent = frame
 
 local label = Instance.new("TextLabel")
 label.Parent = frame
-label.Size = UDim2.new(1, 0, 0, 35)
-label.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-label.Text = "  San Diego Anti-Cheat Bypass"
+label.Size = UDim2.new(1, 0, 0, 40)
+label.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+label.Text = "  San Diego Border RP | Безопасный Чит"
 label.TextColor3 = Color3.fromRGB(255, 165, 0)
-ui.Name = "UltimateBypassMenu"
 label.TextSize = 14
-label.Parent = frame
 
 local labelCorner = Instance.new("UICorner")
 labelCorner.CornerRadius = UDim.new(0, 8)
 labelCorner.Parent = label
 
-local button = Instance.new("TextButton")
-button.Parent = frame
-button.Size = UDim2.new(0.9, 0, 0, 45)
-button.Position = UDim2.new(0.05, 0, 0.45, 0)
-button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-button.Text = "Клик-Телепорт (Зажмите CTRL + Клик мыши)"
-button.TextColor3 = Color3.fromRGB(255, 255, 255)
-button.TextSize = 12
+-- КНОПКА 1: БЕСКОНЕЧНЫЙ РАДИУС ДЕЙСТВИЯ (Взаимодействие через всю карту)
+local BtnRange = Instance.new("TextButton")
+BtnRange.Parent = frame
+BtnRange.Size = UDim2.new(0.9, 0, 0, 40)
+BtnRange.Position = UDim2.new(0.05, 0, 0.32, 0)
+BtnRange.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+BtnRange.Text = "Включить клики через всю карту"
+BtnRange.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnRange.TextSize = 13
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 5)
-btnCorner.Parent = button
+local c1 = Instance.new("UICorner")
+c1.CornerRadius = UDim.new(0, 5)
+c1.Parent = BtnRange
 
--- Переменные для работы безопасного клика
-local uis = game:GetService("UserInputService")
-local player = game.Players.LocalPlayer
-local mouse = player:GetMouse()
-local bypassEnabled = false
-
-button.MouseButton1Click:Connect(function()
-    bypassEnabled = not bypassEnabled
-    if bypassEnabled then
-        button.Text = "КЛИК-ТЕЛЕПОРТ: АКТИВИРОВАН"
-        button.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+local rangeActive = false
+BtnRange.MouseButton1Click:Connect(function()
+    rangeActive = not rangeActive
+    if rangeActive then
+        BtnRange.Text = "БЕСКОНЕЧНЫЙ РАДИУС: РАБОТАЕТ"
+        BtnRange.BackgroundColor3 = Color3.fromRGB(0, 140, 0)
+        
+        -- Увеличиваем радиус действия всех кнопок (Е-шек) в игре до максимума
+        task.spawn(function()
+            while rangeActive do
+                for _, prompt in pairs(game.Workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") then
+                        prompt.MaxActivationDistance = 999999 -- Теперь кнопку видно из любой точки карты
+                        prompt.RequiresLineOfSight = false    -- Можно нажимать сквозь стены
+                    end
+                end
+                task.wait(2)
+            end
+        end)
     else
-        button.Text = "Клик-Телепорт (Зажмите CTRL + Клик мыши)"
-        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        BtnRange.Text = "Включить клики через всю карту"
+        BtnRange.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
     end
 end)
 
--- 2. ЛОГИКА ОБХОДА: Мгновенный перенос с обманом рэйкаста сервера
-mouse.Button1Down:Connect(function()
-    if bypassEnabled and uis:IsKeyDown(Enum.KeyCode.LeftControl) then
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
-            local targetPos = mouse.Hit.Position
-            
-            -- Сбиваем детекцию анимации перед телепортом
-            char.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-            task.wait(0.02)
-            
-            -- Переносим персонажа чуть выше точки клика (чтобы не застрять в текстурах пола)
-            char.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-            
-            -- Мгновенно возвращаем в рабочее состояние, обнуляя счетчик движения для античета
-            char.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
-            char.HumanoidPlatformStand = false
+-- КНОПКА 2: ХОЖДЕНИЕ СКВОЗЬ СТЕНЫ (Noclip)
+local BtnNoclip = Instance.new("TextButton")
+BtnNoclip.Parent = frame
+BtnNoclip.Size = UDim2.new(0.9, 0, 0, 40)
+BtnNoclip.Position = UDim2.new(0.05, 0, 0.65, 0)
+BtnNoclip.BackgroundColor3 = Color3.fromRGB(40, 70, 120)
+BtnNoclip.Text = "Включить проход сквозь стены (Noclip)"
+BtnNoclip.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnNoclip.TextSize = 13
+
+local c2 = Instance.new("UICorner")
+c2.CornerRadius = UDim.new(0, 5)
+c2.Parent = BtnNoclip
+
+local noclipActive = false
+BtnNoclip.MouseButton1Click:Connect(function()
+    noclipActive = not noclipActive
+    if noclipActive then
+        BtnNoclip.Text = "NOCLIP: АКТИВИРОВАН"
+        BtnNoclip.BackgroundColor3 = Color3.fromRGB(0, 90, 160)
+    else
+        BtnNoclip.Text = "Включить проход сквозь стены (Noclip)"
+        BtnNoclip.BackgroundColor3 = Color3.fromRGB(40, 70, 120)
+    end
+end)
+
+-- Цикл ноклипа (отключает коллизию тела с картой)
+game:GetService("RunService").Stepped:Connect(function()
+    if noclipActive then
+        local char = game.Players.LocalPlayer.Character
+        if char then
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
         end
     end
 end)
