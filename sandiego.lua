@@ -1,186 +1,153 @@
--- Проверка на дубликаты интерфейса
-if game.CoreGui:FindFirstChild("SanDiegoFinalHUD") then
-    game.CoreGui.SanDiegoFinalHUD:Destroy()
-end
+-- BorderManager (Server Script)
+-- Этот скрипт управляет всей логикой КПП
 
--- 1. ОСНОВА ИНТЕРФЕЙСА (HUD)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SanDiegoFinalHUD"
-ScreenGui.Parent = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 190)
-MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0) -- Расположение слева
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+-- Создаем Remote Events для связи с клиентом
+local RemoteEvents = Instance.new("Folder")
+RemoteEvents.Name = "BorderRemotes"
+RemoteEvents.Parent = ReplicatedStorage
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 10)
-MainCorner.Parent = MainFrame
+local CheckDocumentEvent = Instance.new("RemoteEvent")
+CheckDocumentEvent.Name = "CheckDocument"
+CheckDocumentEvent.Parent = RemoteEvents
 
--- Стильная неоновая обводка
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(0, 170, 255)
-UIStroke.Thickness = 2
-UIStroke.Parent = MainFrame
+local ScanVehicleEvent = Instance.new("RemoteEvent")
+ScanVehicleEvent.Name = "ScanVehicle"
+ScanVehicleEvent.Parent = RemoteEvents
 
--- Заголовок меню
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-Title.Text = "  SAN DIEGO RP | PREMIUM HUD"
-Title.TextColor3 = Color3.fromRGB(0, 170, 255)
-Title.TextSize = 13
-Title.Font = Enum.Font.GothamBold
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = MainFrame
+local BorderStatusEvent = Instance.new("RemoteEvent")
+BorderStatusEvent.Name = "BorderStatus"
+BorderStatusEvent.Parent = RemoteEvents
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = Title
+-- Настройки зоны КПП (Измени координаты под свой карту!)
+local BORDER_ZONE = {
+    Center = Vector3.new(0, 0, 0), -- Центр КПП (где стоят будки)
+    Radius = 50, -- Радиус зоны
+    CheckpointOffset = Vector3.new(0, 5, 0) -- Точка для спавна эффектов
+}
 
--- Индикатор скрытия меню
-local BindText = Instance.new("TextLabel")
-BindText.Size = UDim2.new(0.5, 0, 0, 40)
-BindText.Position = UDim2.new(0.5, -10, 0, 0)
-BindText.BackgroundTransparency = 1
-BindText.Text = "[Правый Shift для сворачивания]"
-BindText.TextColor3 = Color3.fromRGB(150, 150, 150)
-BindText.TextSize = 10
-BindText.Font = Enum.Font.Gotham
-BindText.TextXAlignment = Enum.TextXAlignment.Right
-BindText.Parent = MainFrame
+-- База данных разыскиваемых авто (для примера)
+local WANTED_VEHICLES = {
+    ["ABC-123"] = true,
+    ["XPT-666"] = true,
+    ["LOL-001"] = true
+}
 
--- Текст статуса для кнопки F
-local VehIndicator = Instance.new("TextLabel")
-VehIndicator.Size = UDim2.new(0.9, 0, 0, 45)
-VehIndicator.Position = UDim2.new(0.05, 0, 0.28, 0)
-VehIndicator.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: ОЖИДАНИЕ"
-VehIndicator.TextColor3 = Color3.fromRGB(200, 200, 200)
-VehIndicator.TextSize = 12
-VehIndicator.Font = Enum.Font.Gotham
-VehIndicator.Parent = MainFrame
-
-local IndCorner = Instance.new("UICorner")
-IndCorner.CornerRadius = UDim.new(0, 6)
-IndCorner.Parent = VehIndicator
-
--- Кнопка активации ВХ (ESP)
-local EspButton = Instance.new("TextButton")
-EspButton.Size = UDim2.new(0.9, 0, 0, 45)
-EspButton.Position = UDim2.new(0.05, 0, 0.65, 0)
-EspButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-EspButton.Text = "Включить ESP Wallhack"
-EspButton.TextColor3 = Color3.fromRGB(0, 170, 255)
-EspButton.TextSize = 13
-EspButton.Font = Enum.Font.GothamBold
-EspButton.Parent = MainFrame
-
-local BtnCorner = Instance.new("UICorner")
-BtnCorner.CornerRadius = UDim.new(0, 6)
-BtnCorner.Parent = EspButton
-
--- Переменные управления
-local uis = game:GetService("UserInputService")
-local runService = game:GetService("RunService")
-local players = game:GetService("Players")
-local localPlayer = players.LocalPlayer
-
-local menuVisible = true
-local espActive = false
-local isFPressed = false
-local carSpeedValue = 0.55 -- Безопасное ускорение, чтобы античит не кикал
-
--- 2. СКРЫТИЕ/ОТКРЫТИЕ НА ПРАВЫЙ ШИФТ
-uis.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        menuVisible = not menuVisible
-        MainFrame.Visible = menuVisible
+-- Функция проверки документов у игрока
+local function checkPlayerDocuments(player)
+    -- Ищем в инвентаре игрока предмет "Visa" или "Passport"
+    -- В San Diego RP обычно используется Tool или IntValue в игроке
+    local backpack = player.Backpack
+    local hasVisa = false
+    
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") and (item.Name == "Visa" or item.Name == "Passport") then
+            hasVisa = true
+            break
+        end
     end
-end)
-
--- 3. ОТСЛЕЖИВАНИЕ КЛАВИШИ FДЛЯ УСКОРЕНИЯ МАШИНЫ
-uis.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F then
-        isFPressed = true
-    end
-end)
-
-uis.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.F then
-        isFPressed = false
-        VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: ОЖИДАНИЕ"
-        VehIndicator.TextColor3 = Color3.fromRGB(200, 200, 200)
-    end
-end)
-
--- 4. ЛОГИКА ИМПУЛЬСНОГО РАЗГОНА НА F
-runService.Heartbeat:Connect(function()
-    if isFPressed then
-        local char = localPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            local seat = char.Humanoid.SeatPart
-            if seat and seat:IsA("VehicleSeat") then
-                local carBody = seat.Parent.PrimaryPart or seat
-                if seat.Throttle > 0 then
-                    VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: НАДДУВ АКТИВЕН"
-                    VehIndicator.TextColor3 = Color3.fromRGB(0, 255, 100)
-                    -- Безопасный сдвиг вперед по вектору движения
-                    carBody.CFrame = carBody.CFrame + (carBody.CFrame.LookVector * carSpeedValue)
-                end
-            else
-                VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: СЯДЬТЕ ЗА РУЛЬ!"
-                VehIndicator.TextColor3 = Color3.fromRGB(255, 100, 100)
+    
+    -- Также проверяем в руках
+    if player.Character then
+        local character = player.Character
+        for _, item in pairs(character:GetChildren()) do
+            if item:IsA("Tool") and (item.Name == "Visa" or item.Name == "Passport") then
+                hasVisa = true
+                break
             end
         end
     end
-end)
-
--- 5. ЛОГИКА ESP WALLHACK (ВХ)
-local function applyESP(player)
-    if player == localPlayer then return end
-    local function addHighlight(char)
-        if not char:FindFirstChild("ESPHighlight") then
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "ESPHighlight"
-            highlight.Parent = char
-            highlight.FillColor = Color3.fromRGB(255, 50, 50) -- Игроки красные
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            highlight.FillTransparency = 0.5
-            
-            -- Подсветка полиции синим
-            if player.Team and (player.Team.Name:match("Police") or player.Team.Name:match("Agent") or player.Team.Name:match("Patrol")) then
-                highlight.FillColor = Color3.fromRGB(0, 100, 255)
-            end
-        end
-    end
-    if player.Character then addHighlight(player.Character) end
-    player.CharacterAdded:Connect(addHighlight)
+    
+    return hasVisa
 end
 
-EspButton.MouseButton1Click:Connect(function()
-    espActive = not espActive
-    if espActive then
-        EspButton.Text = "ESP: АКТИВИРОВАН"
-        EspButton.BackgroundColor3 = Color3.fromRGB(0, 120, 50)
-        EspButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        for _, p in pairs(players:GetPlayers()) do applyESP(p) end
-        players.PlayerAdded:Connect(applyESP)
+-- Функция проверки машины (по номеру)
+local function checkVehicle(vehicle)
+    if not vehicle or not vehicle:IsA("VehicleSeat") then return false end
+    -- Ищем атрибут "LicensePlate" у машины или родительской модели
+    local parent = vehicle.Parent
+    if parent then
+        local plate = parent:FindFirstChild("LicensePlate")
+        if plate and plate:IsA("StringValue") then
+            return WANTED_VEHICLES[plate.Value] or false
+        end
+    end
+    return false
+end
+
+-- Обработчик запроса на проверку документов (от полиции)
+CheckDocumentEvent.OnServerEvent:Connect(function(player, targetPlayer)
+    -- Проверяем, что игрок который вызывает (player) - полицейский (или имеет ранг)
+    -- Для примера пропустим проверку ранга, но в реале добавь проверку Team или Rank
+    
+    if not targetPlayer or not targetPlayer:IsA("Player") then return end
+    
+    local hasDocs = checkPlayerDocuments(targetPlayer)
+    local message = ""
+    local color = Color3.new(0, 1, 0) -- Зеленый по умолчанию
+    
+    if hasDocs then
+        message = targetPlayer.Name .. " имеет действующие документы. ✅"
     else
-        EspButton.Text = "Включить ESP Wallhack"
-        EspButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-        EspButton.TextColor3 = Color3.fromRGB(0, 170, 255)
-        for _, p in pairs(players:GetPlayers()) do
-            if p.Character and p.Character:FindFirstChild("ESPHighlight") then
-                p.Character.ESPHighlight:Destroy()
+        message = targetPlayer.Name .. " НЕ ИМЕЕТ документов! 🚨 Арестуйте его!"
+        color = Color3.new(1, 0, 0)
+    end
+    
+    -- Отправляем результат обратно инициатору проверки
+    BorderStatusEvent:FireClient(player, message, color)
+    
+    -- Логируем в чат сервера для всех (RP атмосфера)
+    print(string.format("[Пограничный контроль] %s проверил %s. Результат: %s", player.Name, targetPlayer.Name, hasDocs and "Одобрено" or "Отказ"))
+    
+    -- Бонус: Если документов нет, кидаем эффект тревоги (для всех)
+    if not hasDocs then
+        for _, plr in pairs(Players:GetPlayers()) do
+            BorderStatusEvent:FireClient(plr, "ВНИМАНИЕ! Нарушитель на КПП!", Color3.new(1, 0, 0))
+        end
+    end
+end)
+
+-- Обработчик сканирования номеров
+ScanVehicleEvent.OnServerEvent:Connect(function(player, vehicle)
+    if not vehicle or not vehicle:IsA("VehicleSeat") then 
+        BorderStatusEvent:FireClient(player, "Ошибка: Объект не является транспортом.", Color3.new(1, 1, 0))
+        return 
+    end
+    
+    local isWanted = checkVehicle(vehicle)
+    local message = ""
+    local color = Color3.new(0, 1, 0)
+    
+    if isWanted then
+        message = "🚨 ТРАНСПОРТ В РОЗЫСКЕ! Задержите водителя! 🚨"
+        color = Color3.new(1, 0, 0)
+        -- Тут можно добавить спавн NPC полиции или звук сирены
+    else
+        message = "Транспорт чист. Можете пропустить."
+    end
+    
+    BorderStatusEvent:FireClient(player, message, color)
+end)
+
+-- Система автоматического обнаружения зоны (для красоты)
+-- Игроки, заходящие в зону КПП, получают уведомление
+task.spawn(function()
+    while task.wait(5) do -- Проверка раз в 5 секунд для оптимизации
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local rootPart = player.Character.HumanoidRootPart
+                local distance = (rootPart.Position - BORDER_ZONE.Center).Magnitude
+                
+                if distance < BORDER_ZONE.Radius then
+                    BorderStatusEvent:FireClient(player, "Вы въехали в зону пограничного контроля. Приготовьте документы.", Color3.new(0, 0.5, 1))
+                end
             end
         end
     end
 end)
+
+print("Border Control System загружен!")
