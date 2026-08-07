@@ -1,18 +1,17 @@
--- Удаляем старый интерфейс, если он запущен
-if game.CoreGui:FindFirstChild("SanDiegoPremiumHUD") then
-    game.CoreGui.SanDiegoPremiumHUD:Destroy()
+-- Проверка на дубликаты интерфейса
+if game.CoreGui:FindFirstChild("SanDiegoFinalHUD") then
+    game.CoreGui.SanDiegoFinalHUD:Destroy()
 end
 
--- Создаем основу современного HUD
+-- 1. ОСНОВА ИНТЕРФЕЙСА (HUD)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SanDiegoPremiumHUD"
+ScreenGui.Name = "SanDiegoFinalHUD"
 ScreenGui.Parent = game:GetService("CoreGui")
 
--- Главный фрейм (HUD)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 320, 0, 190)
-MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0) -- Стильное расположение слева на экране
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0) -- Расположение слева
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -23,7 +22,7 @@ local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 10)
 MainCorner.Parent = MainFrame
 
--- Неоновая обводка HUD
+-- Стильная неоновая обводка
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Color = Color3.fromRGB(0, 170, 255)
 UIStroke.Thickness = 2
@@ -35,7 +34,7 @@ Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 Title.Text = "  SAN DIEGO RP | PREMIUM HUD"
 Title.TextColor3 = Color3.fromRGB(0, 170, 255)
-Title.TextSize = 14
+Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
@@ -44,7 +43,19 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = Title
 
--- ИНДИКАТОР КЛАВИШИ F (Ускорение машины)
+-- Индикатор скрытия меню
+local BindText = Instance.new("TextLabel")
+BindText.Size = UDim2.new(0.5, 0, 0, 40)
+BindText.Position = UDim2.new(0.5, -10, 0, 0)
+BindText.BackgroundTransparency = 1
+BindText.Text = "[Правый Shift для сворачивания]"
+BindText.TextColor3 = Color3.fromRGB(150, 150, 150)
+BindText.TextSize = 10
+BindText.Font = Enum.Font.Gotham
+BindText.TextXAlignment = Enum.TextXAlignment.Right
+BindText.Parent = MainFrame
+
+-- Текст статуса для кнопки F
 local VehIndicator = Instance.new("TextLabel")
 VehIndicator.Size = UDim2.new(0.9, 0, 0, 45)
 VehIndicator.Position = UDim2.new(0.05, 0, 0.28, 0)
@@ -59,7 +70,7 @@ local IndCorner = Instance.new("UICorner")
 IndCorner.CornerRadius = UDim.new(0, 6)
 IndCorner.Parent = VehIndicator
 
--- КНОПКА ВКЛЮЧЕНИЯ ESP (Валлхака)
+-- Кнопка активации ВХ (ESP)
 local EspButton = Instance.new("TextButton")
 EspButton.Size = UDim2.new(0.9, 0, 0, 45)
 EspButton.Position = UDim2.new(0.05, 0, 0.65, 0)
@@ -80,11 +91,21 @@ local runService = game:GetService("RunService")
 local players = game:GetService("Players")
 local localPlayer = players.LocalPlayer
 
+local menuVisible = true
 local espActive = false
 local isFPressed = false
-local carSpeedValue = 0.55 -- Самое сбалансированное значение микро-толчка, чтобы не убивало!
+local carSpeedValue = 0.55 -- Безопасное ускорение, чтобы античит не кикал
 
--- 1. СЛЕЖЕНИЕ ЗА НАЖАТИЕМ КЛАВИШИ F
+-- 2. СКРЫТИЕ/ОТКРЫТИЕ НА ПРАВЫЙ ШИФТ
+uis.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        menuVisible = not menuVisible
+        MainFrame.Visible = menuVisible
+    end
+end)
+
+-- 3. ОТСЛЕЖИВАНИЕ КЛАВИШИ FДЛЯ УСКОРЕНИЯ МАШИНЫ
 uis.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.F then
@@ -100,19 +121,18 @@ uis.InputEnded:Connect(function(input)
     end
 end)
 
--- 2. ЛОГИКА БЕЗОПАСНОГО РАЗГОНА МАШИНЫ НА "F"
+-- 4. ЛОГИКА ИМПУЛЬСНОГО РАЗГОНА НА F
 runService.Heartbeat:Connect(function()
     if isFPressed then
         local char = localPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
             local seat = char.Humanoid.SeatPart
-            -- Проверяем, сидим ли за рулем
             if seat and seat:IsA("VehicleSeat") then
                 local carBody = seat.Parent.PrimaryPart or seat
                 if seat.Throttle > 0 then
                     VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: НАДДУВ АКТИВЕН"
                     VehIndicator.TextColor3 = Color3.fromRGB(0, 255, 100)
-                    -- Микро-смещение вперед по вектору направления машины
+                    -- Безопасный сдвиг вперед по вектору движения
                     carBody.CFrame = carBody.CFrame + (carBody.CFrame.LookVector * carSpeedValue)
                 end
             else
@@ -123,7 +143,7 @@ runService.Heartbeat:Connect(function()
     end
 end)
 
--- 3. ЛОГИКА ESP WALLHACK
+-- 5. ЛОГИКА ESP WALLHACK (ВХ)
 local function applyESP(player)
     if player == localPlayer then return end
     local function addHighlight(char)
@@ -131,12 +151,13 @@ local function applyESP(player)
             local highlight = Instance.new("Highlight")
             highlight.Name = "ESPHighlight"
             highlight.Parent = char
-            highlight.FillColor = Color3.fromRGB(255, 50, 50)
+            highlight.FillColor = Color3.fromRGB(255, 50, 50) -- Игроки красные
             highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
             highlight.FillTransparency = 0.5
             
-            if player.Team and (player.Team.Name:match("Police") or player.Team.Name:match("Agent")) then
-                highlight.FillColor = Color3.fromRGB(0, 100, 255) -- Копы синие
+            -- Подсветка полиции синим
+            if player.Team and (player.Team.Name:match("Police") or player.Team.Name:match("Agent") or player.Team.Name:match("Patrol")) then
+                highlight.FillColor = Color3.fromRGB(0, 100, 255)
             end
         end
     end
