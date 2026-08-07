@@ -1,135 +1,136 @@
--- Очищаем старые меню, если висели в игре
-if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SimpleSD_ESP") then
-    game:GetService("Players").LocalPlayer.PlayerGui.SimpleSD_ESP:Destroy()
+-- Чистим старые меню
+if game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("SD_ESP_Menu") then
+    game:GetService("Players").LocalPlayer.PlayerGui.SD_ESP_Menu:Destroy()
 end
 
 -- ============================================
--- ПЕРЕМЕННЫЕ И СЕРВИСЫ
+-- СЕРВИСЫ И ПОДГОТОВКА
 -- ============================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UIS = game:GetService("UserInputService")
 
--- Ждем, пока персонаж появится, чтобы не получить nil ошибки
-repeat task.wait() until LocalPlayer.Character
+-- Ждем загрузки персонажа (уберегает от вылетов при старте)
+repeat task.wait() until LocalPlayer and LocalPlayer.Character
 
 -- ============================================
--- СОЗДАНИЕ ЛЕГКОГО GUI (без CoreGui, безопасно)
+-- СОЗДАНИЕ ЛЕГКОГО GUI
 -- ============================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SimpleSD_ESP"
-ScreenGui.Parent = LocalPlayer.PlayerGui
-ScreenGui.ResetOnSpawn = false -- Чтобы не пропадало при смерти
+ScreenGui.Name = "SD_ESP_Menu"
+ScreenGui.Parent = LocalPlayer.PlayerGui -- Не CoreGui, чтобы инжектор не крашнулся
+ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 220, 0, 75)
 MainFrame.Position = UDim2.new(0.5, -110, 0.5, -37.5)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Parent = ScreenGui
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 25)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Title.Text = "SAN DIEGO ESP MENU"
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "SAN DIEGO ESP"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
 Title.Parent = MainFrame
 
-local EspToggleBtn = Instance.new("TextButton")
-EspToggleBtn.Size = UDim2.new(0.9, 0, 0, 30)
-EspToggleBtn.Position = UDim2.new(0.05, 0, 0.5, 0)
-EspToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-EspToggleBtn.Text = "Включить ESP (Wallhack)"
-EspToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-EspToggleBtn.Font = Enum.Font.Gotham
-EspToggleBtn.TextSize = 12
-EspToggleBtn.Parent = MainFrame
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.5, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+ToggleBtn.Text = "Включить ESP (Wallhack)"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.Gotham
+ToggleBtn.TextSize = 12
+ToggleBtn.Parent = MainFrame
 
 -- ============================================
--- ЛОГИКА ESP (Безопасная)
+-- ЛОГИКА ESP ЧЕРЕЗ HIGHLIGHT (РАБОТАЕТ 100%)
 -- ============================================
 local espActive = false
-local espConnections = {}
+local espConnections = {} -- Храним ивенты, чтобы отключать их при выключении
 
 local function ClearESP()
-    -- Отключаем все коннекты
+    -- Отключаем все слежения за игроками
     for _, conn in pairs(espConnections) do
         conn:Disconnect()
     end
     espConnections = {}
     
-    -- Удаляем все нарисованные коробки
-    for _, p in pairs(Players:GetPlayers()) do
-        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local box = p.Character.HumanoidRootPart:FindFirstChild("SD_BoxESP")
-            if box then box:Destroy() end
+    -- Убираем подсветку со всех игроков
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hl = player.Character:FindFirstChild("SD_Highlight")
+            if hl then hl:Destroy() end
         end
     end
 end
 
-local function CreateESPForPlayer(player)
-    if player == LocalPlayer then return end -- Не рисовать на себе
-
-    local function AddBox(char)
+local function SetupPlayerESP(player)
+    if player == LocalPlayer then return end
+    
+    local function AddHighlight(char)
         if not espActive then return end
         
-        local root = char:WaitForChild("HumanoidRootPart", 2)
-        if not root then return end
+        -- Если подсветка уже есть, удаляем старую перед созданием новой
+        local old = char:FindFirstChild("SD_Highlight")
+        if old then old:Destroy() end
         
-        -- Проверка, чтобы не спамить коробками
-        if root:FindFirstChild("SD_BoxESP") then return end
+        task.wait(0.2) -- Небольшая задержка, чтобы персонаж успел прогрузиться
         
-        -- Создаем коробку
-        local box = Instance.new("BoxHandleAdornment")
-        box.Name = "SD_BoxESP"
-        box.Size = Vector3.new(4, 6, 4)
-        box.AlwaysOnTop = true -- Видно сквозь стены (Wallhack)
-        box.ZIndex = 10
-        box.Translucency = 0.4
-        box.Adornee = root
-        box.Parent = root
-        box.Color3 = Color3.fromRGB(255, 50, 50) -- По умолчанию красный (враг)
-        
-        -- Логика цвета для San Diego RP (Синий для полиции)
-        if player.Team then
-            local teamName = player.Team.Name
-            if teamName:find("Police") or teamName:find("Agent") or teamName:find("Patrol") or teamName:find("PD") then
-                box.Color3 = Color3.fromRGB(0, 150, 255) -- Синий
+        if espActive then
+            local hl = Instance.new("Highlight")
+            hl.Name = "SD_Highlight"
+            hl.Adornee = char
+            hl.FillColor = Color3.fromRGB(255, 50, 50) -- Красный (враг)
+            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+            hl.FillTransparency = 0.5
+            hl.OutlineTransparency = 0
+            hl.Parent = char
+            
+            -- Если полиция - синий
+            if player.Team then
+                local teamName = player.Team.Name
+                if teamName:find("Police") or teamName:find("Agent") or teamName:find("Patrol") or teamName:find("PD") then
+                    hl.FillColor = Color3.fromRGB(0, 120, 255) -- Синий
+                end
             end
         end
     end
     
     if player.Character then
-        AddBox(player.Character)
+        AddHighlight(player.Character)
     end
     
-    -- Следим за респавном игрока
-    local conn = player.CharacterAdded:Connect(AddBox)
-    table.insert(espConnections, conn)
+    -- Следим за респавнами
+    local con = player.CharacterAdded:Connect(AddHighlight)
+    table.insert(espConnections, con)
 end
 
--- Действие по нажатию на кнопку
-EspToggleBtn.MouseButton1Click:Connect(function()
+-- Нажатие на кнопку
+ToggleBtn.MouseButton1Click:Connect(function()
     espActive = not espActive
     
     if espActive then
-        EspToggleBtn.Text = "ESP: ВКЛЮЧЕН"
-        EspToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+        ToggleBtn.Text = "ESP: ВКЛЮЧЕН"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 0)
         
-        -- Рисуем всех, кто уже на сервере
+        -- Включаем на всех, кто сейчас есть
         for _, p in pairs(Players:GetPlayers()) do
-            CreateESPForPlayer(p)
+            SetupPlayerESP(p)
         end
         
-        -- Следим за новыми игроками, которые заходят
-        local conn = Players.PlayerAdded:Connect(CreateESPForPlayer)
+        -- Подключаем новых заходящих игроков
+        local conn = Players.PlayerAdded:Connect(SetupPlayerESP)
         table.insert(espConnections, conn)
     else
-        EspToggleBtn.Text = "Включить ESP (Wallhack)"
-        EspToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+        ToggleBtn.Text = "Включить ESP (Wallhack)"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+        
         ClearESP()
     end
 end)
@@ -140,8 +141,8 @@ end)
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        MainFrame.Visible = not MainFrame.Visible -- Скрыть или показать меню
+        MainFrame.Visible = not MainFrame.Visible
     end
 end)
 
-print("✅ Легкий ESP для San Diego загружен. Нажми Правый Shift, чтобы открыть меню.")
+print("✅ ESP через Highlight успешно загружен! Нажми Правый Shift.")
