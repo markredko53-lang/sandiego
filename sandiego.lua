@@ -1,109 +1,164 @@
-if game.CoreGui:FindFirstChild("SanDiegoUltimateMenu") then
-    game.CoreGui.SanDiegoUltimateMenu:Destroy()
+-- Удаляем старый интерфейс, если он запущен
+if game.CoreGui:FindFirstChild("SanDiegoPremiumHUD") then
+    game.CoreGui.SanDiegoPremiumHUD:Destroy()
 end
 
-local ui = Instance.new("ScreenGui")
-ui.Name = "SanDiegoUltimateMenu"
-ui.Parent = game.CoreGui
+-- Создаем основу современного HUD
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SanDiegoPremiumHUD"
+ScreenGui.Parent = game:GetService("CoreGui")
 
-local frame = Instance.new("Frame")
-frame.Parent = ui
-frame.Size = UDim2.new(0, 300, 0, 160)
-frame.Position = UDim2.new(0.4, 0, 0.4, 0)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-frame.Active = true
-frame.Draggable = true
+-- Главный фрейм (HUD)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 190)
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0) -- Стильное расположение слева на экране
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = frame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
 
-local label = Instance.new("TextLabel")
-label.Parent = frame
-label.Size = UDim2.new(1, 0, 0, 40)
-label.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-label.Text = "  San Diego Border RP | Безопасный Чит"
-label.TextColor3 = Color3.fromRGB(255, 165, 0)
-label.TextSize = 14
+-- Неоновая обводка HUD
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 170, 255)
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
 
-local labelCorner = Instance.new("UICorner")
-labelCorner.CornerRadius = UDim.new(0, 8)
-labelCorner.Parent = label
+-- Заголовок меню
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+Title.Text = "  SAN DIEGO RP | PREMIUM HUD"
+Title.TextColor3 = Color3.fromRGB(0, 170, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
 
--- КНОПКА 1: БЕСКОНЕЧНЫЙ РАДИУС ДЕЙСТВИЯ (Взаимодействие через всю карту)
-local BtnRange = Instance.new("TextButton")
-BtnRange.Parent = frame
-BtnRange.Size = UDim2.new(0.9, 0, 0, 40)
-BtnRange.Position = UDim2.new(0.05, 0, 0.32, 0)
-BtnRange.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
-BtnRange.Text = "Включить клики через всю карту"
-BtnRange.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnRange.TextSize = 13
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
 
-local c1 = Instance.new("UICorner")
-c1.CornerRadius = UDim.new(0, 5)
-c1.Parent = BtnRange
+-- ИНДИКАТОР КЛАВИШИ F (Ускорение машины)
+local VehIndicator = Instance.new("TextLabel")
+VehIndicator.Size = UDim2.new(0.9, 0, 0, 45)
+VehIndicator.Position = UDim2.new(0.05, 0, 0.28, 0)
+VehIndicator.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: ОЖИДАНИЕ"
+VehIndicator.TextColor3 = Color3.fromRGB(200, 200, 200)
+VehIndicator.TextSize = 12
+VehIndicator.Font = Enum.Font.Gotham
+VehIndicator.Parent = MainFrame
 
-local rangeActive = false
-BtnRange.MouseButton1Click:Connect(function()
-    rangeActive = not rangeActive
-    if rangeActive then
-        BtnRange.Text = "БЕСКОНЕЧНЫЙ РАДИУС: РАБОТАЕТ"
-        BtnRange.BackgroundColor3 = Color3.fromRGB(0, 140, 0)
-        
-        -- Увеличиваем радиус действия всех кнопок (Е-шек) в игре до максимума
-        task.spawn(function()
-            while rangeActive do
-                for _, prompt in pairs(game.Workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") then
-                        prompt.MaxActivationDistance = 999999 -- Теперь кнопку видно из любой точки карты
-                        prompt.RequiresLineOfSight = false    -- Можно нажимать сквозь стены
-                    end
+local IndCorner = Instance.new("UICorner")
+IndCorner.CornerRadius = UDim.new(0, 6)
+IndCorner.Parent = VehIndicator
+
+-- КНОПКА ВКЛЮЧЕНИЯ ESP (Валлхака)
+local EspButton = Instance.new("TextButton")
+EspButton.Size = UDim2.new(0.9, 0, 0, 45)
+EspButton.Position = UDim2.new(0.05, 0, 0.65, 0)
+EspButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+EspButton.Text = "Включить ESP Wallhack"
+EspButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+EspButton.TextSize = 13
+EspButton.Font = Enum.Font.GothamBold
+EspButton.Parent = MainFrame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = EspButton
+
+-- Переменные управления
+local uis = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+
+local espActive = false
+local isFPressed = false
+local carSpeedValue = 0.55 -- Самое сбалансированное значение микро-толчка, чтобы не убивало!
+
+-- 1. СЛЕЖЕНИЕ ЗА НАЖАТИЕМ КЛАВИШИ F
+uis.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        isFPressed = true
+    end
+end)
+
+uis.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.F then
+        isFPressed = false
+        VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: ОЖИДАНИЕ"
+        VehIndicator.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end)
+
+-- 2. ЛОГИКА БЕЗОПАСНОГО РАЗГОНА МАШИНЫ НА "F"
+runService.Heartbeat:Connect(function()
+    if isFPressed then
+        local char = localPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local seat = char.Humanoid.SeatPart
+            -- Проверяем, сидим ли за рулем
+            if seat and seat:IsA("VehicleSeat") then
+                local carBody = seat.Parent.PrimaryPart or seat
+                if seat.Throttle > 0 then
+                    VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: НАДДУВ АКТИВЕН"
+                    VehIndicator.TextColor3 = Color3.fromRGB(0, 255, 100)
+                    -- Микро-смещение вперед по вектору направления машины
+                    carBody.CFrame = carBody.CFrame + (carBody.CFrame.LookVector * carSpeedValue)
                 end
-                task.wait(2)
+            else
+                VehIndicator.Text = "Зажмите [ F ] в машине для ускорения\nСтатус: СЯДЬТЕ ЗА РУЛЬ!"
+                VehIndicator.TextColor3 = Color3.fromRGB(255, 100, 100)
             end
-        end)
-    else
-        BtnRange.Text = "Включить клики через всю карту"
-        BtnRange.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+        end
     end
 end)
 
--- КНОПКА 2: ХОЖДЕНИЕ СКВОЗЬ СТЕНЫ (Noclip)
-local BtnNoclip = Instance.new("TextButton")
-BtnNoclip.Parent = frame
-BtnNoclip.Size = UDim2.new(0.9, 0, 0, 40)
-BtnNoclip.Position = UDim2.new(0.05, 0, 0.65, 0)
-BtnNoclip.BackgroundColor3 = Color3.fromRGB(40, 70, 120)
-BtnNoclip.Text = "Включить проход сквозь стены (Noclip)"
-BtnNoclip.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnNoclip.TextSize = 13
-
-local c2 = Instance.new("UICorner")
-c2.CornerRadius = UDim.new(0, 5)
-c2.Parent = BtnNoclip
-
-local noclipActive = false
-BtnNoclip.MouseButton1Click:Connect(function()
-    noclipActive = not noclipActive
-    if noclipActive then
-        BtnNoclip.Text = "NOCLIP: АКТИВИРОВАН"
-        BtnNoclip.BackgroundColor3 = Color3.fromRGB(0, 90, 160)
-    else
-        BtnNoclip.Text = "Включить проход сквозь стены (Noclip)"
-        BtnNoclip.BackgroundColor3 = Color3.fromRGB(40, 70, 120)
+-- 3. ЛОГИКА ESP WALLHACK
+local function applyESP(player)
+    if player == localPlayer then return end
+    local function addHighlight(char)
+        if not char:FindFirstChild("ESPHighlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "ESPHighlight"
+            highlight.Parent = char
+            highlight.FillColor = Color3.fromRGB(255, 50, 50)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.FillTransparency = 0.5
+            
+            if player.Team and (player.Team.Name:match("Police") or player.Team.Name:match("Agent")) then
+                highlight.FillColor = Color3.fromRGB(0, 100, 255) -- Копы синие
+            end
+        end
     end
-end)
+    if player.Character then addHighlight(player.Character) end
+    player.CharacterAdded:Connect(addHighlight)
+end
 
--- Цикл ноклипа (отключает коллизию тела с картой)
-game:GetService("RunService").Stepped:Connect(function()
-    if noclipActive then
-        local char = game.Players.LocalPlayer.Character
-        if char then
-            for _, part in pairs(char:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
+EspButton.MouseButton1Click:Connect(function()
+    espActive = not espActive
+    if espActive then
+        EspButton.Text = "ESP: АКТИВИРОВАН"
+        EspButton.BackgroundColor3 = Color3.fromRGB(0, 120, 50)
+        EspButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        for _, p in pairs(players:GetPlayers()) do applyESP(p) end
+        players.PlayerAdded:Connect(applyESP)
+    else
+        EspButton.Text = "Включить ESP Wallhack"
+        EspButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+        EspButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+        for _, p in pairs(players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("ESPHighlight") then
+                p.Character.ESPHighlight:Destroy()
             end
         end
     end
